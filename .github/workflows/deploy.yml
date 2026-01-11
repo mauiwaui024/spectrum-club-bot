@@ -104,10 +104,10 @@ jobs:
           exit 1
         fi
         
-        if [ -f "docker-compose.yml" ]; then
-          echo "✅ docker-compose.yml found"
+        if [ -f "docker/docker-compose.yml" ]; then
+          echo "✅ docker/docker-compose.yml found"
         else
-          echo "❌ docker-compose.yml not found"
+          echo "❌ docker/docker-compose.yml not found"
           exit 1
         fi
 
@@ -128,7 +128,7 @@ jobs:
       run: |
         scp -o StrictHostKeyChecking=no \
             bot-image.tar.gz \
-            docker-compose.yml \
+            docker/docker-compose.yml \
             ${{ secrets.SSH_USER }}@${{ secrets.SERVER_HOST }}:/opt/spectrum-bot/
 
     - name: 🚀 Deploy on server
