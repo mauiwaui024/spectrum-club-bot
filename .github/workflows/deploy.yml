@@ -36,8 +36,7 @@ jobs:
 
     - name: 🏗️ Build Docker image
       run: |
-        docker build -t spectrum-club-bot:${{ github.sha }} -f ./docker/Dockerfile
-
+        docker build -t spectrum-club-bot:${{ github.sha }} -f ./docker/Dockerfile .
         docker save spectrum-club-bot:${{ github.sha }} | gzip > bot-image.tar.gz
 
     - name: 📦 Copy files to server
