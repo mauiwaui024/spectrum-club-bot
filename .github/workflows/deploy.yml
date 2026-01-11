@@ -111,6 +111,15 @@ jobs:
       with:
         ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
+    - name: 🌐 Add server to known_hosts
+      run: |
+        echo "🔑 Adding server to known_hosts..."
+        mkdir -p ~/.ssh
+        chmod 700 ~/.ssh
+        ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+        chmod 600 ~/.ssh/known_hosts
+        echo "✅ Server added to known_hosts"
+
     - name: 🏗️ Build Docker image
       run: |
         echo "🔨 Building Docker image..."
@@ -128,14 +137,15 @@ jobs:
     - name: 📦 Copy files to server
       run: |
         echo "📤 Copying files to server..."
-        scp -r \
+        scp -o StrictHostKeyChecking=no -r \
           bot-image.tar.gz \
           docker-compose.yml \
           ${{ secrets.SSH_USER }}@${{ secrets.SERVER_HOST }}:/opt/spectrum-bot/
+        echo "✅ Files copied successfully"
 
     - name: 🚀 Deploy on server
       run: |
-        ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_HOST }} "
+        ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_HOST }} "
           cd /opt/spectrum-bot && \
           
           echo '📦 Loading Docker image...' && \
