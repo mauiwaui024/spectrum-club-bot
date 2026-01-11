@@ -55,19 +55,19 @@
 #           # Загружаем образ
 #           docker load -i bot-image.tar.gz && \
           
-#           # Создаем .env файл из секретов
-#           cat > scripts/.env << EOF
-#           BOT_TOKEN=${{ secrets.BOT_TOKEN }}
-#           DB_USER=${{ secrets.DB_USER }}
-#           DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-#           DB_NAME=${{ secrets.DB_NAME }}
-#           DB_SSL_MODE=${{ secrets.DB_SSL_MODE }}
-#           APP_ENV=production
-#           LOG_LEVEL=${{ secrets.LOG_LEVEL }}
-#           BOT_DEBUG=${{ secrets.BOT_DEBUG }}
-#           ADMIN_IDS=${{ secrets.ADMIN_IDS }}
-#           IMAGE_TAG=${{ github.sha }}
-#           EOF
+          # # Создаем .env файл из секретов
+          # cat > scripts/.env << EOF
+          # BOT_TOKEN=${{ secrets.BOT_TOKEN }}
+          # DB_USER=${{ secrets.DB_USER }}
+          # DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          # DB_NAME=${{ secrets.DB_NAME }}
+          # DB_SSL_MODE=${{ secrets.DB_SSL_MODE }}
+          # APP_ENV=production
+          # LOG_LEVEL=${{ secrets.LOG_LEVEL }}
+          # BOT_DEBUG=${{ secrets.BOT_DEBUG }}
+          # ADMIN_IDS=${{ secrets.ADMIN_IDS }}
+          # IMAGE_TAG=${{ github.sha }}
+          # EOF
           
 #           # Запускаем деплой
 #           cd scripts && \
@@ -95,74 +95,91 @@ jobs:
     - name: 📥 Checkout code
       uses: actions/checkout@v4
 
-    - name: 📁 Verify Dockerfile exists
+    - name: 📁 Verify files exist
       run: |
         if [ -f "./docker/Dockerfile" ]; then
           echo "✅ Dockerfile found at ./docker/Dockerfile"
         else
           echo "❌ Dockerfile not found at ./docker/Dockerfile"
-          echo "Looking for Dockerfile..."
-          find . -name "Dockerfile*" -type f
+          exit 1
+        fi
+        
+        if [ -f "docker-compose.yml" ]; then
+          echo "✅ docker-compose.yml found"
+        else
+          echo "❌ docker-compose.yml not found"
           exit 1
         fi
 
     - name: 🔐 Setup SSH
-      uses: webfactory/ssh-agent@v0.9.0
-      with:
-        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-
-    - name: 🌐 Add server to known_hosts
       run: |
-        echo "🔑 Adding server to known_hosts..."
         mkdir -p ~/.ssh
         chmod 700 ~/.ssh
-        ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
-        chmod 600 ~/.ssh/known_hosts
-        echo "✅ Server added to known_hosts"
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
     - name: 🏗️ Build Docker image
       run: |
-        echo "🔨 Building Docker image..."
         docker build -t spectrum-club-bot:${{ github.sha }} -f ./docker/Dockerfile .
-        
-        echo "🏷️ Tagging as latest..."
-        docker tag spectrum-club-bot:${{ github.sha }} spectrum-club-bot:latest
-        
-        echo "💾 Saving image to archive..."
         docker save spectrum-club-bot:${{ github.sha }} | gzip > bot-image.tar.gz
-        
-        echo "📊 Image info:"
-        docker images | grep spectrum-club-bot
 
     - name: 📦 Copy files to server
       run: |
-        echo "📤 Copying files to server..."
-        scp -o StrictHostKeyChecking=no -r \
-          bot-image.tar.gz \
-          docker/docker-compose.yml \
-          ${{ secrets.SSH_USER }}@${{ secrets.SERVER_HOST }}:/opt/spectrum-bot/
-        echo "✅ Files copied successfully"
+        scp -o StrictHostKeyChecking=no \
+            bot-image.tar.gz \
+            docker-compose.yml \
+            ${{ secrets.SSH_USER }}@${{ secrets.SERVER_HOST }}:/opt/spectrum-bot/
 
     - name: 🚀 Deploy on server
       run: |
-        ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_HOST }} "
-          cd /opt/spectrum-bot && \
+        ssh -o StrictHostKeyChecking=no \
+            ${{ secrets.SSH_USER }}@${{ secrets.SERVER_HOST }} "
+          set -e
           
-          echo '📦 Loading Docker image...' && \
-          docker load -i bot-image.tar.gz && \
+          echo '📦 Loading Docker image...'
+          cd /opt/spectrum-bot
+          docker load -i bot-image.tar.gz
           
-          echo '🔄 Updating docker-compose.yml with new tag...' && \
-          sed -i 's/image: spectrum-club-bot:.*/image: spectrum-club-bot:${{ github.sha }}/' docker-compose.yml && \
+          echo '📝 Creating .env file...'
+          # Создаем файл с переменными окружения
+          cat > .env << 'EOF'
+          DB_USER=${{ secrets.DB_USER }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          DB_NAME=${{ secrets.DB_NAME }}
+          BOT_TOKEN=${{ secrets.BOT_TOKEN }}
+          DB_SSL_MODE=require
+          LOG_LEVEL=info
+          BOT_DEBUG=false
+          APP_ENV=production
+          IMAGE_TAG=${{ github.sha }}
+          EOF
           
-          echo '🚀 Restarting services...' && \
-          docker compose down --remove-orphans 2>/dev/null || true && \
-          docker compose up -d && \
+          # Защищаем файл
+          chmod 600 .env
           
-          echo '🧹 Cleaning up...' && \
-          rm -f bot-image.tar.gz && \
+          echo '🔄 Updating docker-compose.yml...'
+          # Обновляем тег образа
+          sed -i 's|image: spectrum-club-bot:.*|image: spectrum-club-bot:${{ github.sha }}|' docker-compose.yml
           
-          echo '✅ Deployment completed!' && \
-          echo '' && \
-          echo '📊 Container status:' && \
+          echo '🚀 Starting services...'
+          # Останавливаем старые контейнеры
+          docker compose down --remove-orphans 2>/dev/null || true
+          
+          # Запускаем новые с .env файлом
+          docker compose --env-file .env up -d
+          
+          echo '⏳ Waiting for PostgreSQL to be ready...'
+          sleep 10
+          
+          echo '🧹 Cleaning up...'
+          rm -f bot-image.tar.gz
+          
+          echo '✅ Deployment completed!'
+          echo ''
+          echo '📊 Container status:'
           docker ps --filter 'name=spectrum' --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
+          echo ''
+          echo '📈 PostgreSQL health:'
+          docker inspect --format='{{.State.Health.Status}}' spectrum-postgres-prod || echo 'Not found'
         "
