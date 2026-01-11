@@ -139,7 +139,7 @@ jobs:
         echo "📤 Copying files to server..."
         scp -o StrictHostKeyChecking=no -r \
           bot-image.tar.gz \
-          docker-compose.yml \
+          docker/docker-compose.yml \
           ${{ secrets.SSH_USER }}@${{ secrets.SERVER_HOST }}:/opt/spectrum-bot/
         echo "✅ Files copied successfully"
 
