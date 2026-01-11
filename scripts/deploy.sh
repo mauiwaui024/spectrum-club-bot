@@ -34,7 +34,7 @@ docker rm spectrum-bot-prod 2>/dev/null || true
 
 # Запускаем сервисы
 echo "🚀 Starting services with Docker Compose..."
-docker-compose -f ../docker-compose.yml up -d --remove-orphans
+docker compose -f ../docker-compose.yml up -d --remove-orphans
 
 # Проверяем здоровье контейнеров
 echo "🏥 Checking container health..."

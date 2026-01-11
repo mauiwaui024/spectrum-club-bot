@@ -155,8 +155,8 @@ jobs:
           sed -i 's/image: spectrum-club-bot:.*/image: spectrum-club-bot:${{ github.sha }}/' docker-compose.yml && \
           
           echo '🚀 Restarting services...' && \
-          docker-compose down --remove-orphans 2>/dev/null || true && \
-          docker-compose up -d && \
+          docker compose down --remove-orphans 2>/dev/null || true && \
+          docker compose up -d && \
           
           echo '🧹 Cleaning up...' && \
           rm -f bot-image.tar.gz && \
