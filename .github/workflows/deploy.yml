@@ -152,66 +152,66 @@ jobs:
             ${{ secrets.SSH_USER }}@${{ secrets.SERVER_HOST }}:/opt/spectrum-bot/
         echo "✅ Files copied successfully"
 
-    - name: 🚀 Deploy on server
-      run: |
-        ssh -o StrictHostKeyChecking=no \
-            ${{ secrets.SSH_USER }}@${{ secrets.SERVER_HOST }} "
-          set -e
-          
-          echo '📦 Loading Docker image...'
-          cd /opt/spectrum-bot
-          docker load -i bot-image.tar.gz
-          
-          echo '🔍 Getting PostgreSQL container IP...'
-          # Получаем IP адрес PostgreSQL в сети postgres-db_postgres-net
-          POSTGRES_IP=\$(docker inspect -f '{{range .NetworkSettings.Networks}}{{if eq .NetworkName \"postgres-db_postgres-net\"}}{{.IPAddress}}{{end}}{{end}}' postgres-db-spectrum)
-          echo \"PostgreSQL IP in network: \${POSTGRES_IP}\"
-          
-          if [ -z \"\${POSTGRES_IP}\" ]; then
-            echo '❌ Cannot get PostgreSQL IP. Trying bridge network...'
-            POSTGRES_IP=\$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' postgres-db-spectrum | head -1)
-            echo \"PostgreSQL IP (bridge): \${POSTGRES_IP}\"
-          fi
-          
-          if [ -z \"\${POSTGRES_IP}\" ]; then
-            echo '❌ Cannot get PostgreSQL IP at all!'
-            exit 1
-          fi
-          
-          echo '📝 Updating .env with PostgreSQL IP...'
-          sed -i \"s|DB_HOST=.*|DB_HOST=\${POSTGRES_IP}|\" .env
-          
-          echo '🔄 Updating docker-compose.yml with new tag...'
-          sed -i 's|image: spectrum-club-bot:.*|image: spectrum-club-bot:${{ github.sha }}|' docker-compose.yml
-          
-          # Создаем простой docker-compose без указания сети
-          cat > docker-compose.yml << 'EOF'
-          version: '3.8'
-          
-          services:
-            bot:
-              image: spectrum-club-bot:\${IMAGE_TAG:-latest}
-              container_name: spectrum-bot-prod
-              environment:
-                APP_ENV: \${APP_ENV}
-                BOT_TOKEN: \${BOT_TOKEN}
-                DB_HOST: \${DB_HOST}
-                DB_PORT: 5432
-                DB_USER: \${DB_USER}
-                DB_PASSWORD: \${DB_PASSWORD}
-                DB_NAME: \${DB_NAME}
-                DB_SSL_MODE: \${DB_SSL_MODE}
-                LOG_LEVEL: \${LOG_LEVEL}
-              restart: unless-stopped
-          EOF
-          
-          echo '🚀 Starting bot...'
-          docker compose down --remove-orphans 2>/dev/null || true
-          docker compose --env-file .env up -d
-          
-          echo '⏳ Waiting for bot to start...'
-          sleep 10
-          
-          echo '🔍 Bot logs:'
-          docker compose logs --tail=20 bot
-        "
+  - name: 🚀 Deploy on server
+    run: |
+      ssh -o StrictHostKeyChecking=no \
+          ${{ secrets.SSH_USER }}@${{ secrets.SERVER_HOST }} "
+        set -e
+        
+        echo '📦 Loading Docker image...'
+        cd /opt/spectrum-bot
+        docker load -i bot-image.tar.gz
+        
+        echo '🔍 Getting PostgreSQL container IP...'
+        # Получаем IP адрес PostgreSQL в сети postgres-db_postgres-net
+        POSTGRES_IP=\$(docker inspect -f '{{range .NetworkSettings.Networks}}{{if eq .NetworkName \"postgres-db_postgres-net\"}}{{.IPAddress}}{{end}}{{end}}' postgres-db-spectrum)
+        echo \"PostgreSQL IP in network: \${POSTGRES_IP}\"
+        
+        if [ -z \"\${POSTGRES_IP}\" ]; then
+          echo '❌ Cannot get PostgreSQL IP. Trying bridge network...'
+          POSTGRES_IP=\$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' postgres-db-spectrum | head -1)
+          echo \"PostgreSQL IP (bridge): \${POSTGRES_IP}\"
+        fi
+        
+        if [ -z \"\${POSTGRES_IP}\" ]; then
+          echo '❌ Cannot get PostgreSQL IP at all!'
+          exit 1
+        fi
+        
+        echo '📝 Updating .env with PostgreSQL IP...'
+        sed -i \"s|DB_HOST=.*|DB_HOST=\${POSTGRES_IP}|\" .env
+        
+        echo '🔄 Updating docker-compose.yml with new tag...'
+        sed -i 's|image: spectrum-club-bot:.*|image: spectrum-club-bot:${{ github.sha }}|' docker-compose.yml
+        
+        # Создаем простой docker-compose без указания сети
+        cat > docker-compose.yml << 'EOF'
+        version: '3.8'
+        
+        services:
+          bot:
+            image: spectrum-club-bot:\${IMAGE_TAG:-latest}
+            container_name: spectrum-bot-prod
+            environment:
+              APP_ENV: \${APP_ENV}
+              BOT_TOKEN: \${BOT_TOKEN}
+              DB_HOST: \${DB_HOST}
+              DB_PORT: 5432
+              DB_USER: \${DB_USER}
+              DB_PASSWORD: \${DB_PASSWORD}
+              DB_NAME: \${DB_NAME}
+              DB_SSL_MODE: \${DB_SSL_MODE}
+              LOG_LEVEL: \${LOG_LEVEL}
+            restart: unless-stopped
+        EOF
+        
+        echo '🚀 Starting bot...'
+        docker compose down --remove-orphans 2>/dev/null || true
+        docker compose --env-file .env up -d
+        
+        echo '⏳ Waiting for bot to start...'
+        sleep 10
+        
+        echo '🔍 Bot logs:'
+        docker compose logs --tail=20 bot
+      "
