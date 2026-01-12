@@ -104,10 +104,10 @@ jobs:
           exit 1
         fi
         
-        if [ -f "docker/docker-compose.yml" ]; then
-          echo "✅ docker/docker-compose.yml found"
+        if [ -f "docker-compose.yml" ]; then
+          echo "✅ docker-compose.yml found"
         else
-          echo "❌ docker/docker-compose.yml not found"
+          echo "❌ docker-compose.yml not found"
           exit 1
         fi
 
@@ -124,12 +124,33 @@ jobs:
         docker build -t spectrum-club-bot:${{ github.sha }} -f ./docker/Dockerfile .
         docker save spectrum-club-bot:${{ github.sha }} | gzip > bot-image.tar.gz
 
+    - name: 📝 Create .env file locally
+      run: |
+        # Создаем .env файл
+        cat > .env << 'EOF'
+        DB_USER=${{ secrets.DB_USER }}
+        DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+        DB_NAME=${{ secrets.DB_NAME }}
+        BOT_TOKEN=${{ secrets.BOT_TOKEN }}
+        DB_SSL_MODE=require
+        LOG_LEVEL=info
+        BOT_DEBUG=false
+        APP_ENV=production
+        IMAGE_TAG=${{ github.sha }}
+        EOF
+        
+        echo "✅ .env file created"
+        echo "📄 .env content (keys only):"
+        cat .env | sed 's/=.*/=[HIDDEN]/'
+
     - name: 📦 Copy files to server
       run: |
         scp -o StrictHostKeyChecking=no \
             bot-image.tar.gz \
-            docker/docker-compose.yml \
+            docker-compose.yml \
+            .env \
             ${{ secrets.SSH_USER }}@${{ secrets.SERVER_HOST }}:/opt/spectrum-bot/
+        echo "✅ Files copied successfully"
 
     - name: 🚀 Deploy on server
       run: |
@@ -141,36 +162,15 @@ jobs:
           cd /opt/spectrum-bot
           docker load -i bot-image.tar.gz
           
-          echo '📝 Creating .env file...'
-          # Создаем файл с переменными окружения
-          cat > .env << 'EOF'
-          DB_USER=${{ secrets.DB_USER }}
-          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-          DB_NAME=${{ secrets.DB_NAME }}
-          BOT_TOKEN=${{ secrets.BOT_TOKEN }}
-          DB_SSL_MODE=require
-          LOG_LEVEL=info
-          BOT_DEBUG=false
-          APP_ENV=production
-          IMAGE_TAG=${{ github.sha }}
-          EOF
-          
-          # Защищаем файл
-          chmod 600 .env
-          
-          echo '🔄 Updating docker-compose.yml...'
-          # Обновляем тег образа
+          echo '🔄 Updating docker-compose.yml with new tag...'
           sed -i 's|image: spectrum-club-bot:.*|image: spectrum-club-bot:${{ github.sha }}|' docker-compose.yml
           
           echo '🚀 Starting services...'
-          # Останавливаем старые контейнеры
           docker compose down --remove-orphans 2>/dev/null || true
-          
-          # Запускаем новые с .env файлом
           docker compose --env-file .env up -d
           
-          echo '⏳ Waiting for PostgreSQL to be ready...'
-          sleep 10
+          echo '⏳ Waiting for services to start...'
+          sleep 15
           
           echo '🧹 Cleaning up...'
           rm -f bot-image.tar.gz
@@ -180,6 +180,6 @@ jobs:
           echo '📊 Container status:'
           docker ps --filter 'name=spectrum' --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
           echo ''
-          echo '📈 PostgreSQL health:'
-          docker inspect --format='{{.State.Health.Status}}' spectrum-postgres-prod || echo 'Not found'
+          echo '🔍 PostgreSQL logs:'
+          docker compose logs --tail=10 postgres
         "
