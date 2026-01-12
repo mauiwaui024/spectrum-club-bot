@@ -104,7 +104,7 @@ jobs:
           exit 1
         fi
         
-        if [ -f "docker-compose.yml" ]; then
+        if [ -f "docker/docker-compose.yml" ]; then
           echo "✅ docker-compose.yml found"
         else
           echo "❌ docker-compose.yml not found"
@@ -147,7 +147,7 @@ jobs:
       run: |
         scp -o StrictHostKeyChecking=no \
             bot-image.tar.gz \
-            docker-compose.yml \
+            docker/docker-compose.yml \
             .env \
             ${{ secrets.SSH_USER }}@${{ secrets.SERVER_HOST }}:/opt/spectrum-bot/
         echo "✅ Files copied successfully"
