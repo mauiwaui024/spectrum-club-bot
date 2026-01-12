@@ -162,22 +162,48 @@ jobs:
           cd /opt/spectrum-bot
           docker load -i bot-image.tar.gz
           
+          echo '🔍 Getting PostgreSQL container IP...'
+          # Получаем IP адрес PostgreSQL в сети postgres-db_postgres-net
+          POSTGRES_IP=\$(docker inspect -f '{{range .NetworkSettings.Networks}}{{if eq .NetworkName \"postgres-db_postgres-net\"}}{{.IPAddress}}{{end}}{{end}}' postgres-db-spectrum)
+          echo \"PostgreSQL IP in network: \${POSTGRES_IP}\"
+          
+          if [ -z \"\${POSTGRES_IP}\" ]; then
+            echo '❌ Cannot get PostgreSQL IP. Trying bridge network...'
+            POSTGRES_IP=\$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' postgres-db-spectrum | head -1)
+            echo \"PostgreSQL IP (bridge): \${POSTGRES_IP}\"
+          fi
+          
+          if [ -z \"\${POSTGRES_IP}\" ]; then
+            echo '❌ Cannot get PostgreSQL IP at all!'
+            exit 1
+          fi
+          
+          echo '📝 Updating .env with PostgreSQL IP...'
+          sed -i \"s|DB_HOST=.*|DB_HOST=\${POSTGRES_IP}|\" .env
+          
           echo '🔄 Updating docker-compose.yml with new tag...'
           sed -i 's|image: spectrum-club-bot:.*|image: spectrum-club-bot:${{ github.sha }}|' docker-compose.yml
           
-          echo '🔌 Checking if network exists...'
-          if ! docker network ls | grep -q postgres-db_postgres-net; then
-            echo '❌ Network postgres-db_postgres-net not found!'
-            echo 'Trying to create it...'
-            docker network create postgres-db_postgres-net 2>/dev/null || true
-          fi
+          # Создаем простой docker-compose без указания сети
+          cat > docker-compose.yml << 'EOF'
+          version: '3.8'
           
-          echo '🔗 Connecting PostgreSQL to network if not already...'
-          # Проверяем, подключен ли PostgreSQL к сети
-          if ! docker inspect postgres-db-spectrum --format='{{range .NetworkSettings.Networks}}{{.NetworkID}}{{end}}' | grep -q postgres-db_postgres-net; then
-            echo 'Connecting PostgreSQL container to network...'
-            docker network connect postgres-db_postgres-net postgres-db-spectrum 2>/dev/null || echo 'Already connected or failed'
-          fi
+          services:
+            bot:
+              image: spectrum-club-bot:\${IMAGE_TAG:-latest}
+              container_name: spectrum-bot-prod
+              environment:
+                APP_ENV: \${APP_ENV}
+                BOT_TOKEN: \${BOT_TOKEN}
+                DB_HOST: \${DB_HOST}
+                DB_PORT: 5432
+                DB_USER: \${DB_USER}
+                DB_PASSWORD: \${DB_PASSWORD}
+                DB_NAME: \${DB_NAME}
+                DB_SSL_MODE: \${DB_SSL_MODE}
+                LOG_LEVEL: \${LOG_LEVEL}
+              restart: unless-stopped
+          EOF
           
           echo '🚀 Starting bot...'
           docker compose down --remove-orphans 2>/dev/null || true
@@ -186,16 +212,6 @@ jobs:
           echo '⏳ Waiting for bot to start...'
           sleep 10
           
-          echo '🧹 Cleaning up...'
-          rm -f bot-image.tar.gz
-          
-          echo '✅ Deployment completed!'
-          echo ''
-          echo '📊 Container status:'
-          docker ps --filter 'name=spectrum-bot-prod' --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
-          echo ''
           echo '🔍 Bot logs:'
           docker compose logs --tail=20 bot
-          echo ''
-          echo '🌐 Network connections:'
-          docker inspect spectrum-bot-prod --format='{{range .NetworkSettings.Networks}}{{.NetworkID}} ({{.IPAddress}}) {{end}}'
+        "
