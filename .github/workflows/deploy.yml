@@ -165,12 +165,16 @@ jobs:
           echo '🔄 Updating docker-compose.yml with new tag...'
           sed -i 's|image: spectrum-club-bot:.*|image: spectrum-club-bot:${{ github.sha }}|' docker-compose.yml
           
-          echo '🚀 Starting services...'
+          echo '📝 Creating database if not exists...'
+          # Создаем базу в существующем PostgreSQL
+          docker exec postgres-db-spectrum psql -U postgres -c \"CREATE DATABASE spectrum_db;\" 2>/dev/null || echo 'Database already exists or failed to create'
+          
+          echo '🚀 Starting bot...'
           docker compose down --remove-orphans 2>/dev/null || true
           docker compose --env-file .env up -d
           
-          echo '⏳ Waiting for services to start...'
-          sleep 15
+          echo '⏳ Waiting for bot to start...'
+          sleep 5
           
           echo '🧹 Cleaning up...'
           rm -f bot-image.tar.gz
@@ -178,8 +182,8 @@ jobs:
           echo '✅ Deployment completed!'
           echo ''
           echo '📊 Container status:'
-          docker ps --filter 'name=spectrum' --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
+          docker ps --filter 'name=spectrum-bot-prod' --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
           echo ''
-          echo '🔍 PostgreSQL logs:'
-          docker compose logs --tail=10 postgres
+          echo '🔍 Bot logs:'
+          docker compose logs --tail=10 bot
         "
