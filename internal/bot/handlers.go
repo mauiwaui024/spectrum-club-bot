@@ -116,7 +116,7 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) {
 	if message.IsCommand() {
 		switch message.Command() {
 
-		case "je-voudrais-être-votre-étudiant":
+		case "start123":
 			user, err := b.UserService.RegisterOrUpdate(
 				int64(message.From.ID),
 				message.From.FirstName,
@@ -129,7 +129,6 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) {
 				return
 			}
 			b.handleNewStudentCommand(chatID, user)
-
 		case "start":
 			b.handleStartCommand(message.Chat.ID, user)
 		case "coach":
