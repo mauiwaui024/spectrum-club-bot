@@ -165,8 +165,15 @@ jobs:
           echo '🔄 Updating docker-compose.yml with new tag...'
           sed -i 's|image: spectrum-club-bot:.*|image: spectrum-club-bot:${{ github.sha }}|' docker-compose.yml
           
+          echo '🔧 Fixing network configuration...'
+          # Убираем конфликтующие сетевые настройки
+          # Вариант 1: Удаляем network_mode, оставляем только networks
+          sed -i '/network_mode:/d' docker-compose.yml
+          
+          # Или Вариант 2: Удаляем networks, оставляем только network_mode
+          # sed -i '/networks:/,/^[[:space:]]*[^[:space:]]/d' docker-compose.yml
+          
           echo '📝 Creating database if not exists...'
-          # Создаем базу в существующем PostgreSQL
           docker exec postgres-db-spectrum psql -U postgres -c \"CREATE DATABASE spectrum_db;\" 2>/dev/null || echo 'Database already exists or failed to create'
           
           echo '🚀 Starting bot...'

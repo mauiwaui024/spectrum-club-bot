@@ -86,8 +86,6 @@
 #     #   type: nfs
 #     #   o: addr=192.168.1.100,rw
 #     #   device: ":/path/to/nfs/share"
-
-
 version: '3.8'
 
 services:
@@ -97,7 +95,7 @@ services:
     environment:
       APP_ENV: production
       BOT_TOKEN: ${BOT_TOKEN}
-      DB_HOST: postgres-db-spectrum  # Указываем имя существующего контейнера
+      DB_HOST: postgres-db-spectrum  # Имя существующего контейнера PostgreSQL
       DB_PORT: 5432
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
@@ -105,14 +103,6 @@ services:
       DB_SSL_MODE: ${DB_SSL_MODE:-require}
       LOG_LEVEL: ${LOG_LEVEL:-info}
     restart: unless-stopped
-    # Подключаемся к той же сети, что и postgres-db-spectrum
-    network_mode: bridge  # Если postgres-db-spectrum в сети bridge
-    # ИЛИ
-    networks:
-      - existing-network  # Если знаешь имя сети
-
-# Если используешь конкретную сеть
-networks:
-  existing-network:
-    external: true
-    name: bridge  # или другое имя сети
+    # Только network_mode (без networks)
+    network_mode: bridge
+    # Убери networks: ... если есть
