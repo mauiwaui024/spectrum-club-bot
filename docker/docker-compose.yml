@@ -93,16 +93,19 @@ services:
     image: spectrum-club-bot:${IMAGE_TAG:-latest}
     container_name: spectrum-bot-prod
     environment:
-      APP_ENV: production
+      APP_ENV: ${APP_ENV}
       BOT_TOKEN: ${BOT_TOKEN}
-      DB_HOST: postgres-db-spectrum  # Имя существующего контейнера PostgreSQL
+      DB_HOST: postgres-db-spectrum  # Имя контейнера в той же сети
       DB_PORT: 5432
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ${DB_NAME}
-      DB_SSL_MODE: ${DB_SSL_MODE:-require}
-      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DB_SSL_MODE: ${DB_SSL_MODE}
+      LOG_LEVEL: ${LOG_LEVEL}
     restart: unless-stopped
-    # Только network_mode (без networks)
-    network_mode: bridge
-    # Убери networks: ... если есть
+    networks:
+      - postgres-db_postgres-net  # Подключаем к той же сети
+
+networks:
+  postgres-db_postgres-net:
+    external: true  # Используем внешнюю сеть

@@ -162,18 +162,22 @@ jobs:
           cd /opt/spectrum-bot
           docker load -i bot-image.tar.gz
           
-          echo '🔍 Getting PostgreSQL container IP...'
-          # Получаем IP адрес контейнера postgres-db-spectrum
-          POSTGRES_IP=\$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' postgres-db-spectrum)
-          echo \"PostgreSQL IP: \${POSTGRES_IP}\"
-          
-          echo '📝 Updating .env with PostgreSQL IP...'
-          # Обновляем .env файл с IP вместо имени хоста
-          sed -i \"s|DB_HOST=.*|DB_HOST=\${POSTGRES_IP}|\" .env
-          echo \"Updated DB_HOST to: \${POSTGRES_IP}\"
-          
           echo '🔄 Updating docker-compose.yml with new tag...'
           sed -i 's|image: spectrum-club-bot:.*|image: spectrum-club-bot:${{ github.sha }}|' docker-compose.yml
+          
+          echo '🔌 Checking if network exists...'
+          if ! docker network ls | grep -q postgres-db_postgres-net; then
+            echo '❌ Network postgres-db_postgres-net not found!'
+            echo 'Trying to create it...'
+            docker network create postgres-db_postgres-net 2>/dev/null || true
+          fi
+          
+          echo '🔗 Connecting PostgreSQL to network if not already...'
+          # Проверяем, подключен ли PostgreSQL к сети
+          if ! docker inspect postgres-db-spectrum --format='{{range .NetworkSettings.Networks}}{{.NetworkID}}{{end}}' | grep -q postgres-db_postgres-net; then
+            echo 'Connecting PostgreSQL container to network...'
+            docker network connect postgres-db_postgres-net postgres-db-spectrum 2>/dev/null || echo 'Already connected or failed'
+          fi
           
           echo '🚀 Starting bot...'
           docker compose down --remove-orphans 2>/dev/null || true
@@ -182,6 +186,16 @@ jobs:
           echo '⏳ Waiting for bot to start...'
           sleep 10
           
+          echo '🧹 Cleaning up...'
+          rm -f bot-image.tar.gz
+          
+          echo '✅ Deployment completed!'
+          echo ''
+          echo '📊 Container status:'
+          docker ps --filter 'name=spectrum-bot-prod' --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
+          echo ''
           echo '🔍 Bot logs:'
           docker compose logs --tail=20 bot
-        "
+          echo ''
+          echo '🌐 Network connections:'
+          docker inspect spectrum-bot-prod --format='{{range .NetworkSettings.Networks}}{{.NetworkID}} ({{.IPAddress}}) {{end}}'
