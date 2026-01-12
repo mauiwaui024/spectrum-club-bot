@@ -47,7 +47,7 @@ func NewPostgres() (*sqlx.DB, error) {
 		cfg.Username,
 		cfg.Password,
 		cfg.Name,
-		cfg.SSLMode,
+		"disable",
 	)
 
 	db, err := sqlx.Connect("postgres", connStr)
