@@ -132,7 +132,7 @@ jobs:
         DB_PASSWORD=${{ secrets.DB_PASSWORD }}
         DB_NAME=${{ secrets.DB_NAME }}
         BOT_TOKEN=${{ secrets.BOT_TOKEN }}
-        # DB_SSL_MODE=require
+        DB_SSL_MODE=disable
         LOG_LEVEL=info
         BOT_DEBUG=false
         APP_ENV=production
