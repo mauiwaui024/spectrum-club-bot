@@ -53,7 +53,8 @@ jobs:
         DB_SSL_MODE=disable
         LOG_LEVEL=info
         BOT_DEBUG=false
-        APP_ENV=production
+        ENVIRONMENT=${{ secrets.ENVIRONMENT }}
+        BASE_URL=$${{ secrets.BASE_URL }}
         IMAGE_TAG=${{ github.sha }}
         EOF
         
