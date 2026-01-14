@@ -51,6 +51,9 @@ func NewBot(
 	// Определяем базовый URL для веб-сервера
 	webBaseURL := "http://localhost:8080"
 	if config.AppConfig.Environment == "production" {
+		if cfg.BaseURL == "" {
+			return nil, fmt.Errorf("Пустая ссылка для webview")
+		}
 		webBaseURL = cfg.BaseURL // Укажите ваш домен
 	}
 	log.Printf("🤖 URL календаря : %s", webBaseURL)
