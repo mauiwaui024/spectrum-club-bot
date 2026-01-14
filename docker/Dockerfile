@@ -30,6 +30,10 @@ RUN apk add --no-cache tzdata ca-certificates wget && \
 # Копируем бинарник из builder
 COPY --from=builder /app/bin/bot /app/bot
 
+COPY --from=builder /app/web/templates /app/web/templates
+
+# COPY --from=builder /app/web/templates/static /app/web/templates/static
+
 # Создаем non-root пользователя для безопасности
 RUN addgroup -g 1001 -S appuser && \
     adduser -u 1001 -S appuser -G appuser && \

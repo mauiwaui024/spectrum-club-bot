@@ -69,9 +69,9 @@ jobs:
             .env \
             ${{ secrets.SSH_USER }}@${{ secrets.SERVER_HOST }}:/opt/spectrum-bot/
         # Копируем веб-шаблоны рекурсивно
-        scp -r -o StrictHostKeyChecking=no \
-            web/ \
-            ${{ secrets.SSH_USER }}@${{ secrets.SERVER_HOST }}:/opt/spectrum-bot/
+        # scp -r -o StrictHostKeyChecking=no \
+        #     web/ \
+        #     ${{ secrets.SSH_USER }}@${{ secrets.SERVER_HOST }}:/opt/spectrum-bot/
         echo "✅ All files copied successfully"
 
     - name: 🚀 Deploy on server
