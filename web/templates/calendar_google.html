@@ -545,6 +545,25 @@
             background: #f5c6cb !important;
             border-color: #f5c6cb !important;
         }
+
+        /* Новые стили для улучшения отображения событий на мобилках */
+        .events-container {
+            position: relative;
+            height: 100%;
+            margin-top: 30px;
+        }
+
+        .mobile-event {
+            margin-bottom: 4px;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .mobile-event .event-title {
+            white-space: normal;
+            line-height: 1.2;
+        }
+
         /* Responsive */
         @media (max-width: 1024px) {
             .calendar-header {
@@ -556,49 +575,327 @@
             .header-left, .header-right {
                 width: 100%;
                 justify-content: center;
+                flex-wrap: wrap;
             }
             
             .calendar-grid {
                 margin: 16px 8px;
+                overflow-x: auto;
+                min-width: 700px;
             }
             
             .week-container, .day-container {
                 margin: 16px 8px;
+                overflow-x: auto;
+            }
+            
+            .week-grid {
+                min-width: 700px;
+            }
+            
+            .day-grid {
+                min-width: 300px;
             }
         }
 
         @media (max-width: 768px) {
+            /* Улучшаем отображение событий в ячейках для мобилок */
             .calendar-grid {
-                grid-template-columns: 1fr;
+                grid-template-columns: repeat(7, minmax(100px, 1fr));
+                overflow-x: auto;
+                min-width: 700px;
+                -webkit-overflow-scrolling: touch;
             }
             
-            .day-header {
-                text-align: left;
-                display: flex;
-                align-items: center;
-                gap: 12px;
+            .calendar-cell {
+                min-height: 100px !important; /* Фиксированная высота */
+                min-width: 100px;
+                padding: 4px;
+                overflow: visible !important;
             }
             
-            .day-header .date-num {
-                font-size: 20px;
-                margin-bottom: 0;
-            }
-            
-            .week-container, .day-container {
-                flex-direction: column;
-            }
-            
-            .time-column {
+            /* Убираем абсолютное позиционирование для событий на мобилках */
+            .calendar-event {
+                position: relative !important;
+                top: auto !important;
+                left: auto !important;
+                right: auto !important;
+                height: auto !important;
+                margin-bottom: 3px;
                 width: 100%;
-                display: flex;
+                padding: 4px 6px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            
+            /* Уменьшаем отступы для даты */
+            .calendar-cell > div:first-child {
+                position: absolute;
+                top: 2px;
+                left: 4px;
+                font-size: 11px;
+                background: rgba(255,255,255,0.8);
+                padding: 1px 3px;
+                border-radius: 2px;
+            }
+            
+            .events-container {
+                margin-top: 16px;
+                max-height: 80px;
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            
+            .mobile-event {
+                font-size: 10px;
+                line-height: 1.1;
+                padding: 3px 4px;
+                margin-bottom: 2px;
+            }
+            
+            .event-title {
+                font-size: 10px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            
+            .event-time, .event-coach {
+                font-size: 8px;
+                display: none; /* Скрываем на мобилках для экономии места */
+            }
+            
+            /* Показываем только время при наведении или клике */
+            .calendar-event:hover .event-time,
+            .calendar-event:hover .event-coach {
+                display: block;
+            }
+            
+            /* Недельный вид */
+            .week-container {
                 overflow-x: auto;
             }
             
-            .time-slot {
-                flex: 1;
+            .week-grid {
+                grid-template-columns: repeat(7, minmax(120px, 1fr));
+                min-width: 840px;
+            }
+            
+            .time-column {
                 min-width: 60px;
-                height: 40px;
-                border-right: 1px solid #dadce0;
+            }
+            
+            .time-slot {
+                height: 50px;
+                font-size: 11px;
+            }
+            
+            /* Дневной вид */
+            .day-container {
+                overflow-x: auto;
+            }
+            
+            .day-grid {
+                min-width: 500px;
+            }
+            
+            /* Навигация */
+            .calendar-nav {
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 4px;
+                padding: 0 8px;
+            }
+            
+            .nav-date {
+                order: 1;
+                width: 100%;
+                text-align: center;
+                margin: 8px 0;
+                font-size: 14px;
+            }
+            
+            /* Кнопки - ВАЖНО: исправляем выравнивание */
+            .header-right {
+                display: flex;
+                align-items: center; /* Добавляем выравнивание по центру */
+                justify-content: center;
+                flex-wrap: wrap;
+                gap: 8px; /* Увеличиваем отступ между элементами */
+                margin-top: 10px;
+            }
+            
+            .g-btn {
+                padding: 8px 16px; /* Увеличиваем padding для лучшего касания */
+                font-size: 13px;
+                height: 36px; /* Фиксируем высоту */
+                box-sizing: border-box;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            
+            .view-btn {
+                padding: 8px 16px;
+                font-size: 13px;
+                height: 36px; /* Такая же высота как у g-btn */
+                box-sizing: border-box;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            
+            /* Селектор вида - делаем его на одном уровне с кнопкой */
+            .view-selector {
+                margin-left: 0;
+                margin-top: 0; /* Убираем верхний отступ */
+                display: inline-flex;
+                align-items: center;
+                height: 36px; /* Фиксируем высоту */
+                border: 1px solid #dadce0;
+                border-radius: 4px;
+                overflow: hidden;
+            }
+            
+            /* Кнопка "Расписание" - делаем ее на одном уровне */
+            .header-right > .g-btn:last-child {
+                margin: 0; /* Убираем все отступы */
+                height: 36px; /* Такая же высота */
+                min-width: 100px; /* Минимальная ширина для красоты */
+            }
+            
+            /* Убираем неработающие кнопки на мобилках */
+            .header-right .g-btn[href*="today"],
+            .header-right .g-btn[href*="my-schedule"] {
+                display: none;
+            }
+            
+            /* Модальное окно */
+            .modal-content {
+                width: 95%;
+                max-width: 95%;
+                margin: 10px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .calendar-header {
+                padding: 12px 16px;
+            }
+            
+            .logo {
+                font-size: 18px;
+            }
+            
+            .current-date {
+                font-size: 16px;
+            }
+            
+            .calendar-cell {
+                min-height: 90px !important;
+                min-width: 85px;
+            }
+            
+            .calendar-grid {
+                min-width: 595px;
+            }
+            
+            .day-header {
+                padding: 6px 2px;
+            }
+            
+            .day-header .date-num {
+                font-size: 16px;
+            }
+            
+            .day-header .day-name {
+                font-size: 9px;
+            }
+            
+            .events-container {
+                margin-top: 14px;
+                max-height: 70px;
+            }
+            
+            .calendar-event {
+                padding: 3px;
+                margin-bottom: 2px;
+            }
+            
+            .event-title {
+                font-size: 9px;
+            }
+            
+            /* Улучшаем выравнивание в header-right */
+            .header-right {
+                gap: 6px; /* Уменьшаем отступ на маленьких экранах */
+            }
+            
+            .header-right .g-btn {
+                padding: 6px 12px;
+                font-size: 12px;
+                height: 34px; /* Немного уменьшаем высоту */
+            }
+            
+            .view-btn {
+                padding: 6px 12px;
+                font-size: 12px;
+                height: 34px;
+            }
+            
+            .view-selector {
+                height: 34px;
+            }
+            
+            .header-right > .g-btn:last-child {
+                height: 34px;
+                min-width: 90px;
+            }
+            
+            /* Расписание (список) */
+            .schedule-event {
+                padding: 8px;
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .event-time-display {
+                min-width: auto;
+                margin-bottom: 6px;
+                font-size: 12px;
+            }
+            
+            .schedule-event .g-btn {
+                margin-top: 8px;
+                width: 100%;
+            }
+        }
+
+        /* Для очень маленьких экранов (до 360px) */
+        @media (max-width: 360px) {
+            .calendar-grid {
+                min-width: 520px;
+            }
+            
+            .calendar-cell {
+                min-width: 74px;
+            }
+            
+            .calendar-event {
+                padding: 2px;
+                font-size: 8px;
+            }
+            
+            .event-title {
+                font-size: 8px;
+            }
+            
+            .logo {
+                font-size: 16px;
+            }
+            
+            .current-date {
+                font-size: 14px;
             }
         }
     </style>
@@ -614,9 +911,7 @@
                 <div class="current-date">{{.CurrentDate.Format "January 2006"}}</div>
             </div>
             <div class="header-right">
-                {{if .UserID}}
-                <a href="/calendar?user_id={{.UserID}}&view=month&date={{.CurrentDate.Format "2006-01-02"}}" class="g-btn">Сегодня</a>
-                {{end}}
+                <!-- Убраны кнопки "Сегодня" и "Мои записи" -->
                 <div class="view-selector">
                     <button class="view-btn {{if eq .View "month"}}active{{end}}" 
                             onclick='window.location="/calendar?user_id={{.UserID}}&view=month&date={{.CurrentDate.Format "2006-01-02"}}"'>
@@ -633,9 +928,6 @@
                 </div>
                 {{if .UserID}}
                 <a href="/calendar?user_id={{.UserID}}&view=schedule" class="g-btn">Расписание</a>
-                {{if not .IsCoach}}
-                <a href="/my-schedule?user_id={{.UserID}}" class="g-btn g-btn-primary">Мои записи</a>
-                {{end}}
                 {{end}}
             </div>
         </div>
@@ -651,7 +943,7 @@
 
         <!-- Main Calendar Content -->
         {{if eq .View "month"}}
-        <!-- Month View -->
+        <!-- Month View - переделано для мобилок -->
         <div class="calendar-grid">
             <!-- Day headers -->
             {{range .WeekDays}}
@@ -664,18 +956,14 @@
             <!-- Calendar cells -->
             {{range .CalendarDays}}
             <div class="calendar-cell {{if .IsToday}}today{{end}} {{if .IsOtherMonth}}other-month{{end}}"
-                 data-date="{{.Date.Format "2006-01-02"}}"
-                 style="min-height: {{if gt (len .Events) 0}}{{add 120 (mul (len .Events) 30)}}{{else}}120{{end}}px;">
-                <div style="position: absolute; top: 8px; left: 8px; font-size: 12px; color: #5f6368;">
-                    {{.Date.Day}}
-                </div>
+                 data-date="{{.Date.Format "2006-01-02"}}">
+                <div>{{.Date.Day}}</div>
                 
-                <div style="position: relative; height: 100%; margin-top: 30px;">
+                <div class="events-container">
                     {{range $index, $event := .Events}}
-                    <div class="calendar-event event-color-{{$event.ColorIndex}}" 
+                    <div class="calendar-event event-color-{{$event.ColorIndex}} mobile-event" 
                          onclick="showEventDetails('{{$event.ID}}', '{{$event.UserID}}')"
-                         title="{{$event.Title}} - {{$event.Time}}"
-                         style="top: {{$index | mul 30}}px; height: 25px;">
+                         title="{{$event.Title}} - {{$event.Time}}">
                         <div class="event-title">{{$event.Title}}</div>
                         <div class="event-time">{{$event.Time}}</div>
                         {{if $event.Coach}}
@@ -900,83 +1188,83 @@
                 });
         }
 
-// Обновляем содержимое модального окна
-function updateModalContent(data, trainingId, userId) {
-    // Основная информация
-    document.getElementById('modalTitle').textContent = data.training.group_name;
-    document.getElementById('modalDate').textContent = formatDate(data.training.training_date);
-    document.getElementById('modalTime').textContent = `${data.training.start_time} - ${data.training.end_time}`;
-    document.getElementById('modalCoach').textContent = data.training.coach_name || 'Не указан';
-    document.getElementById('modalParticipants').textContent = `${data.participants_count}${data.training.max_participants ? ` / ${data.training.max_participants}` : ''}`;
-    document.getElementById('modalDescription').textContent = data.training.description || 'Описание отсутствует';
-    
-    // Список участников - показываем всегда, если есть участники
-    const attendanceSection = document.getElementById('modalAttendanceSection');
-    const attendanceList = document.getElementById('modalAttendanceList');
-    
-    if (data.participants && data.participants.length > 0) {
-        attendanceSection.style.display = 'block';
-        attendanceList.innerHTML = '';
-        
-        data.participants.forEach(participant => {
-            const item = document.createElement('div');
-            item.className = 'attendance-item';
+        // Обновляем содержимое модального окна
+        function updateModalContent(data, trainingId, userId) {
+            // Основная информация
+            document.getElementById('modalTitle').textContent = data.training.group_name;
+            document.getElementById('modalDate').textContent = formatDate(data.training.training_date);
+            document.getElementById('modalTime').textContent = `${data.training.start_time} - ${data.training.end_time}`;
+            document.getElementById('modalCoach').textContent = data.training.coach_name || 'Не указан';
+            document.getElementById('modalParticipants').textContent = `${data.participants_count}${data.training.max_participants ? ` / ${data.training.max_participants}` : ''}`;
+            document.getElementById('modalDescription').textContent = data.training.description || 'Описание отсутствует';
             
-            const firstLetter = participant.student_name ? participant.student_name.charAt(0).toUpperCase() : '?';
+            // Список участников
+            const attendanceSection = document.getElementById('modalAttendanceSection');
+            const attendanceList = document.getElementById('modalAttendanceList');
             
-            item.innerHTML = `
-                <div class="attendance-avatar">${firstLetter}</div>
-                <div>
-                    <div class="attendance-name">${participant.student_name || 'Неизвестный'}</div>
-                    <div class="attendance-time">Записан: ${formatDateTime(participant.created_at)}</div>
-                </div>
-            `;
+            if (data.participants && data.participants.length > 0) {
+                attendanceSection.style.display = 'block';
+                attendanceList.innerHTML = '';
+                
+                data.participants.forEach(participant => {
+                    const item = document.createElement('div');
+                    item.className = 'attendance-item';
+                    
+                    const firstLetter = participant.student_name ? participant.student_name.charAt(0).toUpperCase() : '?';
+                    
+                    item.innerHTML = `
+                        <div class="attendance-avatar">${firstLetter}</div>
+                        <div>
+                            <div class="attendance-name">${participant.student_name || 'Неизвестный'}</div>
+                            <div class="attendance-time">Записан: ${formatDateTime(participant.created_at)}</div>
+                        </div>
+                    `;
+                    
+                    attendanceList.appendChild(item);
+                });
+            } else {
+                attendanceSection.style.display = 'none';
+            }
             
-            attendanceList.appendChild(item);
-        });
-    } else {
-        attendanceSection.style.display = 'none';
-    }
-    
-    // Кнопки действий
-    const actionsDiv = document.getElementById('modalActions');
-    actionsDiv.innerHTML = '';
-    
-    if (data.is_registered) {
-        // Пользователь уже записан
-        actionsDiv.innerHTML = `
-            <button class="modal-btn modal-btn-secondary" onclick="closeModal()">Закрыть</button>
-            <button class="modal-btn modal-btn-danger" onclick="cancelRegistration(${trainingId}, '${userId}')">Отменить запись</button>
-        `;
-    } else if (data.can_register) {
-        // Можно записаться
-        actionsDiv.innerHTML = `
-            <button class="modal-btn modal-btn-secondary" onclick="closeModal()">Закрыть</button>
-            <button class="modal-btn modal-btn-primary" onclick="registerForTraining(${trainingId}, '${userId}')">Записаться</button>
-        `;
-    } else {
-        // Нельзя записаться (прошла, нет мест и т.д.)
-        let reason = '';
-        if (data.is_full) reason = ' (Мест нет)';
-        else if (data.is_past) reason = ' (Тренировка прошла)';
-        
-        actionsDiv.innerHTML = `
-            <button class="modal-btn modal-btn-secondary" onclick="closeModal()">Закрыть</button>
-            <span style="color: #5f6368; padding: 10px;">Невозможно записаться${reason}</span>
-        `;
-    }
-}
+            // Кнопки действий
+            const actionsDiv = document.getElementById('modalActions');
+            actionsDiv.innerHTML = '';
+            
+            if (data.is_registered) {
+                // Пользователь уже записан
+                actionsDiv.innerHTML = `
+                    <button class="modal-btn modal-btn-secondary" onclick="closeModal()">Закрыть</button>
+                    <button class="modal-btn modal-btn-danger" onclick="cancelRegistration(${trainingId}, '${userId}')">Отменить запись</button>
+                `;
+            } else if (data.can_register) {
+                // Можно записаться
+                actionsDiv.innerHTML = `
+                    <button class="modal-btn modal-btn-secondary" onclick="closeModal()">Закрыть</button>
+                    <button class="modal-btn modal-btn-primary" onclick="registerForTraining(${trainingId}, '${userId}')">Записаться</button>
+                `;
+            } else {
+                // Нельзя записаться
+                let reason = '';
+                if (data.is_full) reason = ' (Мест нет)';
+                else if (data.is_past) reason = ' (Тренировка прошла)';
+                
+                actionsDiv.innerHTML = `
+                    <button class="modal-btn modal-btn-secondary" onclick="closeModal()">Закрыть</button>
+                    <span style="color: #5f6368; padding: 10px;">Невозможно записаться${reason}</span>
+                `;
+            }
+        }
 
         // Показываем модальное окно
         function showModal() {
             document.getElementById('trainingModal').style.display = 'flex';
-            document.body.style.overflow = 'hidden'; // Блокируем скролл страницы
+            document.body.style.overflow = 'hidden';
         }
 
         // Закрываем модальное окно
         function closeModal() {
             document.getElementById('trainingModal').style.display = 'none';
-            document.body.style.overflow = 'auto'; // Восстанавливаем скролл
+            document.body.style.overflow = 'auto';
         }
 
         // Форматирование даты
@@ -1009,7 +1297,7 @@ function updateModalContent(data, trainingId, userId) {
                 if (response.ok) {
                     alert('✅ Вы успешно записались на тренировку!');
                     closeModal();
-                    location.reload(); // Перезагружаем страницу для обновления данных
+                    location.reload();
                 } else {
                     return response.text().then(text => {
                         throw new Error(text || 'Ошибка сервера');
@@ -1037,7 +1325,7 @@ function updateModalContent(data, trainingId, userId) {
                 if (response.ok) {
                     alert('✅ Запись отменена');
                     closeModal();
-                    location.reload(); // Перезагружаем страницу для обновления данных
+                    location.reload();
                 } else {
                     return response.text().then(text => {
                         throw new Error(text || 'Ошибка сервера');
@@ -1063,9 +1351,106 @@ function updateModalContent(data, trainingId, userId) {
             }
         });
 
-        // Initialize on page load
+        // Адаптация для мобильных устройств
+        function adaptForMobile() {
+            const isMobile = window.innerWidth <= 768;
+            
+            if (isMobile) {
+                // Добавляем индикатор прокрутки для календаря
+                const calendarGrid = document.querySelector('.calendar-grid');
+                if (calendarGrid && calendarGrid.scrollWidth > calendarGrid.clientWidth) {
+                    calendarGrid.style.position = 'relative';
+                    
+                    // Добавляем индикатор прокрутки
+                    if (!document.getElementById('scroll-hint')) {
+                        const hint = document.createElement('div');
+                        hint.id = 'scroll-hint';
+                        hint.innerHTML = '← Прокрутите →';
+                        hint.style.cssText = `
+                            position: absolute;
+                            bottom: 5px;
+                            right: 5px;
+                            background: rgba(0,0,0,0.7);
+                            color: white;
+                            padding: 4px 8px;
+                            border-radius: 12px;
+                            font-size: 11px;
+                            z-index: 10;
+                            animation: pulse 2s infinite;
+                        `;
+                        
+                        const style = document.createElement('style');
+                        style.textContent = `
+                            @keyframes pulse {
+                                0% { opacity: 0.7; }
+                                50% { opacity: 1; }
+                                100% { opacity: 0.7; }
+                            }
+                        `;
+                        document.head.appendChild(style);
+                        
+                        calendarGrid.appendChild(hint);
+                        
+                        // Убираем подсказку после прокрутки
+                        calendarGrid.addEventListener('scroll', function() {
+                            hint.style.opacity = '0';
+                            setTimeout(() => hint.remove(), 300);
+                        }, { once: true });
+                    }
+                }
+                
+                // Улучшаем отображение событий
+                document.querySelectorAll('.calendar-cell .events-container').forEach(container => {
+                    if (container.scrollHeight > container.clientHeight) {
+                        // Добавляем градиентный индикатор переполнения
+                        container.style.position = 'relative';
+                        container.style.maskImage = 'linear-gradient(to bottom, black 80%, transparent 100%)';
+                        container.style.webkitMaskImage = 'linear-gradient(to bottom, black 80%, transparent 100%)';
+                    }
+                });
+            }
+        }
+
+        // Инициализация при загрузке страницы
         document.addEventListener('DOMContentLoaded', function() {
             positionEvents();
+            adaptForMobile();
+            
+            // На мобилках добавляем возможность свайпа по календарю
+            if (window.innerWidth <= 768) {
+                const calendarGrid = document.querySelector('.calendar-grid');
+                if (calendarGrid) {
+                    let startX = 0;
+                    
+                    calendarGrid.addEventListener('touchstart', function(e) {
+                        startX = e.touches[0].clientX;
+                    });
+                    
+                    calendarGrid.addEventListener('touchend', function(e) {
+                        const endX = e.changedTouches[0].clientX;
+                        const diff = startX - endX;
+                        
+                        // Если свайп больше 50px
+                        if (Math.abs(diff) > 50) {
+                            const prevBtn = document.querySelector('.calendar-nav .g-btn:first-child');
+                            const nextBtn = document.querySelector('.calendar-nav .g-btn:last-child');
+                            
+                            if (diff > 0 && nextBtn) {
+                                // Свайп влево - следующая неделя
+                                nextBtn.click();
+                            } else if (diff < 0 && prevBtn) {
+                                // Свайп вправо - предыдущая неделя
+                                prevBtn.click();
+                            }
+                        }
+                    });
+                }
+            }
+        });
+
+        window.addEventListener('resize', function() {
+            positionEvents();
+            adaptForMobile();
         });
     </script>
 </body>
