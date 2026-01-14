@@ -5,7 +5,7 @@ services:
     image: spectrum-club-bot:${IMAGE_TAG:-latest}
     container_name: spectrum-bot-prod
     environment:
-      APP_ENV: ${APP_ENV}
+      ENVIRONMENT: ${ENVIRONMENT}
       BOT_TOKEN: ${BOT_TOKEN}
       DB_HOST: postgres-db-spectrum  # Имя контейнера в той же сети
       DB_PORT: 5432
