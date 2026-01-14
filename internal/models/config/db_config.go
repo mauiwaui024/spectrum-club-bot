@@ -22,7 +22,7 @@ func Load() error {
 
 	AppConfig = &Config{
 		HTTPPort:    getEnv("HTTP_PORT", "8080"),
-		Environment: env,
+		Environment: getEnv("ENVIROMENT", "development"),
 		Bot: BotConfig{
 			Token:    getEnv("BOT_TOKEN", ""),
 			Debug:    getEnvAsBool("BOT_DEBUG", env != "production"),
