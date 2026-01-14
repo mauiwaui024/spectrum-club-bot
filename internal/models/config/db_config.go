@@ -21,11 +21,13 @@ func Load() error {
 	env := getEnv("APP_ENV", "development")
 
 	AppConfig = &Config{
+		HTTPPort:    getEnv("HTTP_PORT", "8080"),
 		Environment: env,
 		Bot: BotConfig{
 			Token:    getEnv("BOT_TOKEN", ""),
 			Debug:    getEnvAsBool("BOT_DEBUG", env != "production"),
 			AdminIDs: parseAdminIDs(getEnv("ADMIN_IDS", "")),
+			BaseURL:  getEnv("BASE_URL", ""),
 		},
 		Database: DatabaseConfig{
 			Host:     getEnv("DB_HOST", "localhost"),

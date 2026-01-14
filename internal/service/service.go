@@ -5,22 +5,6 @@ import (
 	"time"
 )
 
-// type Service struct {
-// 	User         UserService
-// 	Student      StudentService
-// 	Coach        CoachService
-// 	Subscription SubscriptionService
-// }
-
-// func NewService(repo *repository.Repository) *Service {
-// 	return &Service{
-// 		User:         NewUserService(repo.User, repo.Student, repo.Subscription),
-// 		Student:      NewStudentService(repo.Student),
-// 		Coach:        NewCoachService(repo.Coach),
-// 		Subscription: NewSubscriptionService(repo.Subscription),
-// 	}
-// }
-
 type UserService interface {
 	RegisterOrUpdate(telegramID int64, firstName, lastName, username string, role string) (*models.User, error)
 	GetUserProfile(telegramID int64) (*models.User, *models.Student, *models.Subscription, *models.Coach, error)
@@ -29,6 +13,8 @@ type UserService interface {
 
 	GetAllStudents() ([]*models.User, error)
 	GetByID(id int64) (*models.User, error)
+
+	GetByTelegramID(telegramID int64) (*models.User, error)
 }
 
 type StudentService interface {
@@ -119,4 +105,9 @@ type AttendanceService interface {
 	GetAttendanceByStudent(studentID int, start, end time.Time) ([]models.Attendance, error)
 
 	GetStudentAttendanceForTraining(studentID, trainingID int) (*models.Attendance, error)
+
+	GetParticipants(trainingID int) ([]models.AttendanceWithStudent, error)
+	GetStudentSchedule(studentID int, start, end time.Time) ([]models.AttendanceWithTraining, error)
+	CreateAttendance(attendance models.Attendance) error
+	CancelAttendance(trainingID, studentID int) error
 }

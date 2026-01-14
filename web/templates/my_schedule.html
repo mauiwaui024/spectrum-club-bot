@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Моё расписание</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background: #f0f2f5; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .card { background: white; padding: 20px; border-radius: 10px; margin-bottom: 15px; }
+        .btn { padding: 5px 10px; background: #dc3545; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 12px; }
+        .btn-cancel { background: #dc3545; }
+        .btn-cancel:hover { background: #c82333; }
+        .status-badge { padding: 3px 8px; border-radius: 10px; font-size: 12px; }
+        .status-registered { background: #d4edda; color: #155724; }
+        .status-attended { background: #cce5ff; color: #004085; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📅 Моё расписание</h1>
+        <p>Привет, {{.UserName}}! Вот твои ближайшие тренировки:</p>
+        
+        {{range .Items}}
+        <div class="card">
+            <h3>{{.Training.GroupName}}</h3>
+            <p>📅 {{.Training.TrainingDate.Format "02.01.2006"}} в {{.Training.StartTime.Format "15:04"}}</p>
+            {{if .Training.CoachName}}
+            <p>👨‍🏫 Тренер: {{.Training.CoachName}}</p>
+            {{end}}
+            
+            <div style="margin-top: 10px;">
+                {{if eq .Attendance.Status "registered"}}
+                <span class="status-badge status-registered">✅ Записан</span>
+                <form method="POST" action="/cancel" style="display: inline; margin-left: 10px;" 
+                      onsubmit="return confirm('Вы уверены, что хотите отменить запись?');">
+                    <input type="hidden" name="training_id" value="{{.Training.ID}}">
+                    <input type="hidden" name="user_id" value="{{$.UserID}}">
+                    <button type="submit" class="btn btn-cancel">Отменить запись</button>
+                </form>
+                {{else if eq .Attendance.Status "attended"}}
+                <span class="status-badge status-attended">✓ Посещено</span>
+                {{end}}
+            </div>
+        </div>
+        {{else}}
+        <div class="card" style="text-align: center;">
+            <h3>😴 Нет запланированных тренировок</h3>
+            <p>Запишитесь на тренировки через расписание тренера</p>
+        </div>
+        {{end}}
+        
+        <div style="margin-top: 20px; text-align: center;">
+            <a href="/" style="color: #007bff;">← Вернуться на главную</a>
+        </div>
+    </div>
+</body>
+</html>

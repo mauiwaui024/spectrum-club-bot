@@ -140,3 +140,31 @@ func (b *Bot) createStudentsKeyboard(students []*models.User) tgbotapi.ReplyKeyb
 }
 
 // ///////////////////////////////////////////
+
+func createScheduleKeyboard(role string) tgbotapi.ReplyKeyboardMarkup {
+	var rows [][]tgbotapi.KeyboardButton
+
+	if role == "coach" {
+		rows = append(rows, tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton("📅 Мое расписание"),
+			tgbotapi.NewKeyboardButton("➕ Добавить тренировку"),
+		))
+		rows = append(rows, tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton("📋 Создать из шаблонов"),
+			tgbotapi.NewKeyboardButton("✏️ Редактировать тренировку"),
+		))
+		rows = append(rows, tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton("◀️ Назад в главное меню"),
+		))
+	} else {
+		rows = append(rows, tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton("📅 Мое расписание"),
+			tgbotapi.NewKeyboardButton("📝 Записаться на тренировку"),
+		))
+		rows = append(rows, tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton("◀️ Назад в главное меню"),
+		))
+	}
+
+	return tgbotapi.NewReplyKeyboard(rows...)
+}

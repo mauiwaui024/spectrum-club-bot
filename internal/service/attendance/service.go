@@ -99,10 +99,31 @@ func (s *attendanceService) GetTrainingStats(trainingID int) (present, absent, t
 }
 
 func (s *attendanceService) GetAttendanceByStudent(studentID int, start, end time.Time) ([]models.Attendance, error) {
-	// Нужно реализовать этот метод в репозитории
 	return s.attendanceRepo.GetAttendanceByStudent(studentID, start, end)
 }
 
 func (s *attendanceService) GetStudentAttendanceForTraining(studentID, trainingID int) (*models.Attendance, error) {
 	return s.attendanceRepo.GetStudentAttendanceForTraining(studentID, trainingID)
+}
+
+func (s *attendanceService) GetParticipants(trainingID int) ([]models.AttendanceWithStudent, error) {
+	return s.attendanceRepo.GetParticipants(trainingID)
+}
+
+func (s *attendanceService) GetStudentSchedule(studentID int, start, end time.Time) ([]models.AttendanceWithTraining, error) {
+	return s.attendanceRepo.GetStudentSchedule(studentID, start, end)
+}
+
+func (s *attendanceService) CreateAttendance(attendance models.Attendance) error {
+	// Проверяем, не записан ли уже студент
+	existing, err := s.GetStudentAttendanceForTraining(attendance.StudentID, attendance.TrainingID)
+	if err == nil && existing != nil && existing.Status == "registered" {
+		return errors.New("student already registered for this training")
+	}
+
+	return s.attendanceRepo.CreateAttendanceRecord(attendance)
+}
+
+func (s *attendanceService) CancelAttendance(trainingID, studentID int) error {
+	return s.attendanceRepo.CancelAttendance(trainingID, studentID)
 }

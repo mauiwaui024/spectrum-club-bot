@@ -9,7 +9,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 )
 
-// Обработка ссобщения здесь
+// Обработка сообщения здесь
 func (b *Bot) handleMessage(message *tgbotapi.Message) {
 	log.Printf("[%s] %s", message.From.UserName, message.Text)
 
@@ -115,36 +115,50 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) {
 	// Обрабатываем команды (только если нет активной сессии)
 	if message.IsCommand() {
 		switch message.Command() {
-
-		case "start123":
-			user, err := b.UserService.RegisterOrUpdate(
-				int64(message.From.ID),
-				message.From.FirstName,
-				message.From.LastName,
-				message.From.UserName,
-				"student",
-			)
-			if err != nil {
-				log.Printf("Ошибка регистрации пользователя: %v", err)
-				return
+		case "student":
+			if user == nil {
+				user, err = b.UserService.RegisterOrUpdate(
+					int64(message.From.ID),
+					message.From.FirstName,
+					message.From.LastName,
+					message.From.UserName,
+					"student",
+				)
+				if err != nil {
+					log.Printf("Ошибка регистрации пользователя: %v", err)
+					return
+				}
+				b.handleNewStudentCommand(chatID, user)
+			} else if user.Role == "student" {
+				b.sendMessage(chatID, "Вы уже зарегистрированы как студент")
+			} else if user.Role == "coach" {
+				b.sendMessage(chatID, "Вы уже зарегистрированы как тренер")
 			}
-			b.handleNewStudentCommand(chatID, user)
 		case "start":
 			b.handleStartCommand(message.Chat.ID, user)
+		case "schedule":
+			b.handleCalendarCommand(message)
 		case "coach":
 			//регистрируем как тренера
-			user, err := b.UserService.RegisterOrUpdate(
-				int64(message.From.ID),
-				message.From.FirstName,
-				message.From.LastName,
-				message.From.UserName,
-				"coach",
-			)
-			if err != nil {
-				log.Printf("Ошибка регистрации пользователя: %v", err)
-				return
+			if user == nil {
+				user, err = b.UserService.RegisterOrUpdate(
+					int64(message.From.ID),
+					message.From.FirstName,
+					message.From.LastName,
+					message.From.UserName,
+					"coach",
+				)
+				if err != nil {
+					log.Printf("Ошибка регистрации пользователя: %v", err)
+					return
+				}
+				b.handleCoachCommand(message.Chat.ID, user)
+			} else if user.Role == "student" {
+				b.sendMessage(chatID, "Вы уже зарегистрированы как студент")
+			} else if user.Role == "coach" {
+				b.sendMessage(chatID, "Вы уже зарегистрированы как тренер")
 			}
-			b.handleCoachCommand(message.Chat.ID, user)
+
 		default:
 			b.sendWelcomeMessage(message.Chat.ID, user)
 		}

@@ -378,7 +378,7 @@ func (b *Bot) handleMyRegistrations(chatID int64, user *models.User) {
 			continue
 		}
 
-		if training.StartTime.After(now) {
+		if training.TrainingDate.After(now) {
 			upcomingTrainings = append(upcomingTrainings, attendance)
 		} else {
 			pastTrainings = append(pastTrainings, attendance)

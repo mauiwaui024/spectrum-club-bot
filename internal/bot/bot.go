@@ -23,6 +23,8 @@ type Bot struct {
 	////
 	userSessions map[int64]*UserSession // chatID -> session
 	mu           sync.RWMutex
+
+	webBaseURL string // Добавляем базовый URL для веб-сервера
 }
 
 func NewBot(
@@ -46,7 +48,12 @@ func NewBot(
 	}
 
 	api.Debug = cfg.Debug
-
+	// Определяем базовый URL для веб-сервера
+	webBaseURL := "http://localhost:8080"
+	if config.AppConfig.Environment == "production" {
+		webBaseURL = cfg.BaseURL // Укажите ваш домен
+	}
+	log.Printf("🤖 URL календаря : %s", webBaseURL)
 	log.Printf("🤖 Бот инициализирован: %s (debug: %v)", api.Self.UserName, cfg.Debug)
 	log.Printf("👑 Администраторы: %v", cfg.AdminIDs)
 
@@ -60,6 +67,7 @@ func NewBot(
 		AttendanceService:    attendanceService,
 		ScheduleService:      scheduleService,
 		TrainingGroupService: trainingGroupService,
+		webBaseURL:           webBaseURL,
 	}, nil
 }
 func (b *Bot) Start() error {

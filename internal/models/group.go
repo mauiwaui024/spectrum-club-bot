@@ -41,7 +41,28 @@ type Attendance struct {
 	Notes      string    `json:"notes"`
 	RecordedBy *int      `json:"recorded_by"`
 	RecordedAt time.Time `json:"recorded_at"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+	Status     string    `json:"status"` // registered, cancelled, attended
 
 	// Joined fields
 	StudentName string `json:"student_name,omitempty"`
+}
+
+type AttendanceWithStudent struct {
+	Attendance
+	Student struct {
+		ID            int64     `json:"id"`
+		UserID        int64     `json:"user_id"`
+		AthleticTitle string    `json:"athletic_title"`
+		CreatedAt     time.Time `json:"created_at"`
+		UpdatedAt     time.Time `json:"updated_at"`
+		StudentName   string    `json:"student_name"`
+		User          User      `json:"user"`
+	} `json:"student"`
+}
+
+type AttendanceWithTraining struct {
+	Attendance
+	Training TrainingSchedule `json:"training"`
 }
