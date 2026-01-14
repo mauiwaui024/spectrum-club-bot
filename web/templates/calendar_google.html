@@ -1158,12 +1158,12 @@
                 event.style.height = `${height}px`;
             });
         }
-
+    
         function timeToMinutes(time) {
             const [hours, minutes] = time.split(':').map(Number);
             return hours * 60 + (minutes || 0);
         }
-
+    
         // Показываем детали тренировки
         function showEventDetails(trainingId, userId) {
             // Показываем загрузку
@@ -1187,7 +1187,7 @@
                     alert('Ошибка загрузки деталей тренировки');
                 });
         }
-
+    
         // Обновляем содержимое модального окна
         function updateModalContent(data, trainingId, userId) {
             // Основная информация
@@ -1254,33 +1254,33 @@
                 `;
             }
         }
-
+    
         // Показываем модальное окно
         function showModal() {
             document.getElementById('trainingModal').style.display = 'flex';
             document.body.style.overflow = 'hidden';
         }
-
+    
         // Закрываем модальное окно
         function closeModal() {
             document.getElementById('trainingModal').style.display = 'none';
             document.body.style.overflow = 'auto';
         }
-
+    
         // Форматирование даты
         function formatDate(dateString) {
             const date = new Date(dateString);
             const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
             return date.toLocaleDateString('ru-RU', options);
         }
-
+    
         // Форматирование даты и времени
         function formatDateTime(dateTimeString) {
             if (!dateTimeString) return '';
             const date = new Date(dateTimeString);
             return date.toLocaleDateString('ru-RU') + ' ' + date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
         }
-
+    
         // Обновленная функция записи на тренировку
         function registerForTraining(trainingId, userId) {
             if (!confirm('Записаться на эту тренировку?')) return;
@@ -1308,7 +1308,7 @@
                 alert('❌ Ошибка: ' + error.message);
             });
         }
-
+    
         // Функция отмены записи
         function cancelRegistration(trainingId, userId) {
             if (!confirm('Вы уверены, что хотите отменить запись?')) return;
@@ -1336,21 +1336,21 @@
                 alert('❌ Ошибка: ' + error.message);
             });
         }
-
+    
         // Закрытие модального окна при клике вне его
         document.addEventListener('click', function(e) {
             if (e.target.classList.contains('modal-overlay')) {
                 closeModal();
             }
         });
-
+    
         // Закрытие модального окна по ESC
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
                 closeModal();
             }
         });
-
+    
         // Адаптация для мобильных устройств
         function adaptForMobile() {
             const isMobile = window.innerWidth <= 768;
@@ -1410,44 +1410,15 @@
                 });
             }
         }
-
+    
         // Инициализация при загрузке страницы
         document.addEventListener('DOMContentLoaded', function() {
             positionEvents();
             adaptForMobile();
             
-            // На мобилках добавляем возможность свайпа по календарю
-            if (window.innerWidth <= 768) {
-                const calendarGrid = document.querySelector('.calendar-grid');
-                if (calendarGrid) {
-                    let startX = 0;
-                    
-                    calendarGrid.addEventListener('touchstart', function(e) {
-                        startX = e.touches[0].clientX;
-                    });
-                    
-                    calendarGrid.addEventListener('touchend', function(e) {
-                        const endX = e.changedTouches[0].clientX;
-                        const diff = startX - endX;
-                        
-                        // Если свайп больше 50px
-                        if (Math.abs(diff) > 50) {
-                            const prevBtn = document.querySelector('.calendar-nav .g-btn:first-child');
-                            const nextBtn = document.querySelector('.calendar-nav .g-btn:last-child');
-                            
-                            if (diff > 0 && nextBtn) {
-                                // Свайп влево - следующая неделя
-                                nextBtn.click();
-                            } else if (diff < 0 && prevBtn) {
-                                // Свайп вправо - предыдущая неделя
-                                prevBtn.click();
-                            }
-                        }
-                    });
-                }
-            }
+            // УБРАН КОД ДЛЯ СВАЙПА - больше не переключаем месяцы при свайпе
         });
-
+    
         window.addEventListener('resize', function() {
             positionEvents();
             adaptForMobile();
