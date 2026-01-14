@@ -95,4 +95,10 @@ type AttendanceRepository interface {
 
 	// Статистика
 	GetTrainingAttendanceStats(trainingID int) (present, absent, total int, err error)
+
+	//
+	CancelAttendance(trainingID, studentID int) error
+	GetParticipants(trainingID int) ([]models.AttendanceWithStudent, error)
+	GetStudentSchedule(studentID int, start, end time.Time) ([]models.AttendanceWithTraining, error)
+	CreateAttendanceRecord(attendance models.Attendance) error
 }

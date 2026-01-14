@@ -1,85 +1,3 @@
-# name: 🚀 Deploy to Production
-
-# on:
-#   push:
-#     branches: [ main, master ]
-#     paths:
-#       - '**.go'
-#       - 'go.mod'
-#       - 'go.sum'
-#       - 'Dockerfile'
-#       - 'docker-compose.yml'
-#       - 'scripts/**'
-#       - '.github/workflows/**'
-#   workflow_dispatch:  # Ручной запуск
-
-# jobs:
-#   deploy:
-#     runs-on: ubuntu-latest
-#     environment: production  # Используем environment для секретов
-    
-#     steps:
-#     - name: 📥 Checkout code
-#       uses: actions/checkout@v4
-#       with:
-#         fetch-depth: 0
-
-#     - name: 🔐 Setup SSH
-#       uses: webfactory/ssh-agent@v0.9.0
-#       with:
-#         ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-
-#     - name: 🌐 Add server to known_hosts
-#       run: |
-#         mkdir -p ~/.ssh
-#         ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
-
-#     - name: 🏗️ Build Docker image
-#       run: |
-#         docker build -t spectrum-club-bot:${{ github.sha }} -f ./docker/Dockerfile .
-#         docker save spectrum-club-bot:${{ github.sha }} | gzip > bot-image.tar.gz
-
-#     - name: 📦 Copy files to server
-#       run: |
-#         scp -r \
-#           bot-image.tar.gz \
-#           docker-compose.yml \
-#           scripts/ \
-#           ${{ secrets.SSH_USER }}@${{ secrets.SERVER_HOST }}:/opt/spectrum-bot/
-
-#     - name: 🚀 Deploy on server
-#       run: |
-#         ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_HOST }} "
-#           cd /opt/spectrum-bot && \
-          
-#           # Загружаем образ
-#           docker load -i bot-image.tar.gz && \
-          
-          # # Создаем .env файл из секретов
-          # cat > scripts/.env << EOF
-          # BOT_TOKEN=${{ secrets.BOT_TOKEN }}
-          # DB_USER=${{ secrets.DB_USER }}
-          # DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-          # DB_NAME=${{ secrets.DB_NAME }}
-          # DB_SSL_MODE=${{ secrets.DB_SSL_MODE }}
-          # APP_ENV=production
-          # LOG_LEVEL=${{ secrets.LOG_LEVEL }}
-          # BOT_DEBUG=${{ secrets.BOT_DEBUG }}
-          # ADMIN_IDS=${{ secrets.ADMIN_IDS }}
-          # IMAGE_TAG=${{ github.sha }}
-          # EOF
-          
-#           # Запускаем деплой
-#           cd scripts && \
-#           chmod +x deploy.sh && \
-#           ./deploy.sh
-#         "
-
-#     - name: 📝 Deployment status
-#       run: |
-#         echo "✅ Deployment completed successfully!"
-#         echo "Commit: ${{ github.sha }}"
-#         echo "Branch: ${{ github.ref }}"
 name: 🚀 Deploy to Production
 
 on:
@@ -150,7 +68,11 @@ jobs:
             docker/docker-compose.yml \
             .env \
             ${{ secrets.SSH_USER }}@${{ secrets.SERVER_HOST }}:/opt/spectrum-bot/
-        echo "✅ Files copied successfully"
+        # Копируем веб-шаблоны рекурсивно
+        scp -r -o StrictHostKeyChecking=no \
+            web/templates \
+            ${{ secrets.SSH_USER }}@${{ secrets.SERVER_HOST }}:/opt/spectrum-bot/web/
+        echo "✅ All files copied successfully"
 
     - name: 🚀 Deploy on server
       run: |

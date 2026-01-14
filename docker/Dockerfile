@@ -24,7 +24,7 @@ FROM alpine:3.18
 WORKDIR /app
 
 # Устанавливаем только необходимые пакеты
-RUN apk add --no-cache tzdata ca-certificates && \
+RUN apk add --no-cache tzdata ca-certificates wget && \
     update-ca-certificates
 
 # Копируем бинарник из builder

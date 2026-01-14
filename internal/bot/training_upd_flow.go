@@ -11,7 +11,6 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 )
 
-// Упрощенный флоу редактирования тренировки
 func (b *Bot) handleEditTraining(chatID int64, user *models.User) {
 	if user.Role != "coach" {
 		b.sendError(chatID, "❌ Эта функция доступна только тренерам")
@@ -178,7 +177,6 @@ func (b *Bot) handleTrainingSelectionForEdit(chatID int64, messageText string) {
 }
 
 // Упрощенное меню редактирования - только время и место
-// Упрощенное меню редактирования - время, место и удаление
 func (b *Bot) showFieldSelectionMenu(chatID int64, training *models.TrainingSchedule) {
 	group, _ := b.TrainingGroupService.GetGroupByID(training.GroupID)
 	groupName := "Неизвестная группа"
@@ -223,7 +221,6 @@ func (b *Bot) showFieldSelectionMenu(chatID int64, training *models.TrainingSche
 	b.api.Send(msg)
 }
 
-// Обработка выбора поля для редактирования
 func (b *Bot) handleFieldSelectionForEdit(chatID int64, messageText string) {
 	session := b.getOrCreateSession(chatID)
 	if session.State != StateSelectingFieldToEdit {
@@ -247,7 +244,6 @@ func (b *Bot) handleFieldSelectionForEdit(chatID int64, messageText string) {
 	}
 }
 
-// Редактирование времени
 func (b *Bot) showTimeEditMenu(chatID int64) {
 	msg := tgbotapi.NewMessage(chatID,
 		"🕐 *Введите новое время тренировки:*\n\n"+
@@ -411,7 +407,6 @@ func (b *Bot) handlePlaceEdit(chatID int64, messageText string) {
 	b.resetSession(chatID)
 }
 
-// Вспомогательные функции
 func isSameDay(t1, t2 time.Time) bool {
 	y1, m1, d1 := t1.Date()
 	y2, m2, d2 := t2.Date()

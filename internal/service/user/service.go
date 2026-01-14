@@ -129,3 +129,7 @@ func (s *userService) GetAllStudents() ([]*models.User, error) {
 func (s *userService) GetByID(id int64) (*models.User, error) {
 	return s.userRepo.GetByID(id)
 }
+
+func (s *userService) GetByTelegramID(telegramID int64) (*models.User, error) {
+	return s.userRepo.GetByTelegramID(telegramID)
+}

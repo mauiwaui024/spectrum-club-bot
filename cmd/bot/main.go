@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"spectrum-club-bot/internal/bot"
@@ -22,6 +23,7 @@ import (
 	student_service "spectrum-club-bot/internal/service/student"
 	subscription_service "spectrum-club-bot/internal/service/subscription"
 	user_service "spectrum-club-bot/internal/service/user"
+	"spectrum-club-bot/internal/web"
 	database "spectrum-club-bot/pkg"
 	"syscall"
 	"time"
@@ -63,6 +65,15 @@ func main() {
 	//new
 	attendanceService := attendance_service.NewAttendanceService(attendanceRepo, scheduleRepo)
 	scheduleService := schedule_service.NewScheduleService(scheduleRepo, attendanceRepo, templateScheduleRepos, trainingGroupRepo)
+	// Создаем веб-хендлер
+	calendarHandler := web.NewHandler(
+		scheduleService,
+		coachService,
+		attendanceService,
+		studentService,
+		userService,
+	)
+
 	telegramBot, err := bot.NewBot(
 		userService,
 		coachService,
@@ -76,10 +87,41 @@ func main() {
 		log.Fatal("❌ Failed to create bot:", err)
 	}
 
-	// Настраиваем graceful shutdown
+	// Настраиваем HTTP сервер
+	mux := http.NewServeMux()
+
+	// Статические файлы для шаблонов
+	fs := http.FileServer(http.Dir("web/templates/static"))
+	mux.Handle("/static/", http.StripPrefix("/static/", fs))
+
+	// Calendar routes
+	mux.HandleFunc("/api/training/", calendarHandler.TrainingDetailsAPI)
+	// mux.HandleFunc("/api/training", calendarHandler.TrainingDetailsAPI)
+	mux.HandleFunc("/", calendarHandler.Calendar)
+	mux.HandleFunc("/calendar", calendarHandler.Calendar)
+	mux.HandleFunc("/my-calendar", calendarHandler.Calendar) // Alias for student view
+	mux.HandleFunc("/check-registration", calendarHandler.CheckRegistration)
+
+	// API endpoints
+
+	// Registration endpoints
+	mux.HandleFunc("/register", calendarHandler.RegisterForTraining)
+	mux.HandleFunc("/cancel", calendarHandler.CancelRegistration)
+	srv := &http.Server{
+		Addr:    ":" + cfg.HTTPPort,
+		Handler: mux,
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(),
 		os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
+
+	go func() {
+		log.Printf("🌐 HTTP сервер запущен на порту %s", cfg.HTTPPort)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("❌ Ошибка запуска HTTP сервера: %v", err)
+		}
+	}()
 
 	// Запускаем бота в горутине
 	go func() {
