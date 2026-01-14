@@ -18,11 +18,11 @@ type DatabaseConfig struct {
 
 // Load загружает конфигурацию
 func Load() error {
-	env := getEnv("APP_ENV", "development")
+	env := getEnv("ENVIRONMENT", "development")
 
 	AppConfig = &Config{
 		HTTPPort:    getEnv("HTTP_PORT", "8080"),
-		Environment: getEnv("ENVIROMENT", "development"),
+		Environment: env,
 		Bot: BotConfig{
 			Token:    getEnv("BOT_TOKEN", ""),
 			Debug:    getEnvAsBool("BOT_DEBUG", env != "production"),
