@@ -53,8 +53,8 @@ jobs:
         DB_SSL_MODE=disable
         LOG_LEVEL=info
         BOT_DEBUG=false
-        ENVIRONMENT=https://spectrumbot.ru
-        BASE_URL=$${{ secrets.BASE_URL }}
+        ENVIRONMENT=${{ secrets.ENVIRONMENT }}
+        BASE_URL=${{ secrets.BASE_URL }}
         IMAGE_TAG=${{ github.sha }}
         EOF
         
