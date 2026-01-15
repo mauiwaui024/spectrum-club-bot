@@ -227,7 +227,7 @@
   transition: background-color 0.2s ease;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: hidden; /* Скрываем переполнение, но увеличиваем высоту для мобильных */
   min-width: 0;
   width: 100%;
   box-sizing: border-box;
@@ -296,7 +296,7 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  overflow: hidden;
+  overflow: hidden; /* Скрываем переполнение */
   width: 100%;
   max-width: 100%;
   gap: 1px; /* Небольшой отступ между событиями */
@@ -954,17 +954,17 @@
   }
 
   .calendar-cell {
-    height: 100px; /* Увеличиваем высоту на мобильных для лучшей видимости */
-    min-height: 100px;
-    max-height: 100px;
+    height: 140px; /* Увеличиваем высоту на мобильных для отображения всех тренировок (390px ширина) */
+    min-height: 140px;
+    max-height: 140px;
     padding: 2px;
   }
 
   .calendar-cell .day-number {
     font-size: 11px;
     padding: 1px 3px;
-    margin-bottom: 1px; /* Уменьшили отступ */
-    line-height: 1.2; /* Уменьшили высоту строки */
+    margin-bottom: 0; /* Убираем отступ для экономии места */
+    line-height: 1.1; /* Еще больше уменьшаем высоту строки */
   }
 
   .calendar-cell.today .day-number,
@@ -975,21 +975,23 @@
   }
 
   .events-container {
-    margin-top: 1px;
+    margin-top: 0; /* Убираем отступ сверху для экономии места */
     gap: 1px; /* Отступ между событиями на мобильных */
     min-height: 0; /* Важно для правильного flex-распределения */
+    overflow: hidden; /* Скрываем переполнение */
   }
 
   .month-event {
-    padding: 2px 3px;
+    padding: 1px 3px; /* Уменьшаем padding для экономии места */
     min-height: 0; /* Убираем минимальную высоту для равномерного распределения */
     font-size: 9px;
     flex: 1 1 0; /* Равномерно распределяется - каждая тренировка занимает равную долю */
     max-width: 100%;
-    overflow: hidden;
+    overflow: hidden; /* Скрываем переполнение текста */
     display: flex;
     flex-direction: column;
     justify-content: center;
+    line-height: 1.1; /* Уменьшаем высоту строки */
   }
 
   .month-event .event-title {
@@ -1089,9 +1091,9 @@
   }
 
   .calendar-cell {
-    height: 100px; /* Фиксированная высота на мобильных */
-    min-height: 100px;
-    max-height: 100px;
+    height: 120px; /* Фиксированная высота на планшетах */
+    min-height: 120px;
+    max-height: 120px;
     padding: 3px;
   }
 
@@ -1099,9 +1101,26 @@
     font-size: 14px;
   }
 
-  .calendar-event {
+  /* Важно: month-event должен использовать flex, не absolute позиционирование */
+  .month-event {
+    position: relative !important; /* Переопределяем absolute для месячного вида */
+    padding: 2px 4px !important; /* Стандартный padding для месячного вида */
+    flex: 1 1 0 !important; /* Обеспечиваем flex-распределение */
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  
+  /* Для других видов событий (если будут) */
+  .calendar-event:not(.month-event) {
     position: absolute;
     padding: 6px 8px;
+  }
+  
+  /* Убеждаемся, что events-container использует flex */
+  .events-container {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 1px !important;
   }
 
   .mobile-event {
@@ -1159,6 +1178,20 @@
     min-height: 140px;
     max-height: 140px;
   }
+  
+  /* Убеждаемся, что month-event использует flex на больших экранах */
+  .month-event {
+    position: relative !important;
+    flex: 1 1 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  
+  .events-container {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 1px !important;
+  }
 }
 
 /* Touch optimizations */
@@ -1191,6 +1224,50 @@
 
   .events-container {
     margin-top: 6px;
+  }
+}
+
+/* Специальный медиа-запрос для очень узких экранов (390px и меньше) - должен быть после общего */
+@media (max-width: 420px) {
+  .calendar-cell {
+    height: 150px !important; /* Еще больше высота для очень узких экранов, !important для приоритета */
+    min-height: 150px !important;
+    max-height: 150px !important;
+    padding: 1px;
+  }
+  
+  .calendar-cell .day-number {
+    font-size: 10px;
+    padding: 0 3px;
+    margin-bottom: 0;
+    line-height: 1.0;
+  }
+  
+  .calendar-cell.today .day-number,
+  .day-number.today-indicator {
+    width: 18px;
+    height: 18px;
+    font-size: 10px;
+  }
+  
+  .events-container {
+    margin-top: 0;
+    gap: 0.5px; /* Еще меньше отступ между событиями */
+  }
+  
+  .month-event {
+    padding: 1px 2px; /* Минимальный padding */
+    font-size: 8px;
+    line-height: 1.0;
+  }
+  
+  .month-event .event-title {
+    font-size: 8px;
+    line-height: 1.0;
+  }
+  
+  .month-event .event-time {
+    font-size: 6px;
   }
 }
 
