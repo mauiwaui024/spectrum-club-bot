@@ -3,8 +3,8 @@ package web
 import (
 	"encoding/json"
 	"fmt"
-	"html/template"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -19,7 +19,6 @@ type Handler struct {
 	attendanceService service.AttendanceService
 	studentService    service.StudentService
 	userService       service.UserService
-	templates         *template.Template
 }
 
 func NewHandler(
@@ -29,65 +28,20 @@ func NewHandler(
 	studentService service.StudentService,
 	userService service.UserService,
 ) *Handler {
-	// Создаем шаблон с вспомогательными функциями
-	funcMap := template.FuncMap{
-		"formatDate": func(t time.Time) string {
-			return t.Format("02.01.2006")
-		},
-		"formatTime": func(t time.Time) string {
-			if t.IsZero() {
-				return ""
-			}
-			return t.Format("15:04")
-		},
-		"sub": func(a, b int) int {
-			return a - b
-		},
-		"add": func(a, b int) int {
-			return a + b
-		},
-		"gt": func(a, b int) bool {
-			return a > b
-		},
-		"lt": func(a, b int) bool {
-			return a < b
-		},
-		"eq": func(a, b interface{}) bool {
-			return a == b
-		},
-		"ne": func(a, b interface{}) bool {
-			return a != b
-		},
-		"mul": func(a, b int) int {
-			return a * b
-		},
-	}
-
-	// Создаем шаблон и парсим файлы
-	tmpl := template.New("").Funcs(funcMap)
-
-	// Парсим каждый шаблон отдельно
-	templates, err := tmpl.ParseFiles(
-		"web/templates/calendar_google.html",
-		"web/templates/training_detail.html",
-		"web/templates/my_schedule.html",
-	)
-
-	if err != nil {
-		panic(fmt.Sprintf("Ошибка загрузки шаблонов: %v", err))
-	}
-
 	return &Handler{
 		scheduleService:   scheduleService,
 		coachService:      coachService,
 		attendanceService: attendanceService,
 		studentService:    studentService,
 		userService:       userService,
-		templates:         templates,
 	}
 }
 
-func (h *Handler) Calendar(w http.ResponseWriter, r *http.Request) {
+// Calendar method removed - теперь используется Angular фронтенд
+// CalendarAPI используется вместо Calendar для возврата JSON данных
+
+// CalendarAPI возвращает данные календаря в формате JSON
+func (h *Handler) CalendarAPI(w http.ResponseWriter, r *http.Request) {
 	userIDStr := r.URL.Query().Get("user_id")
 	view := r.URL.Query().Get("view")
 	dateStr := r.URL.Query().Get("date")
@@ -154,8 +108,8 @@ func (h *Handler) Calendar(w http.ResponseWriter, r *http.Request) {
 
 	if isCoach && userIDStr != "" {
 		// Для тренера получаем его тренировки
-		coach, err := h.coachService.GetCoachByUserID(userID)
-		if err == nil {
+		coach, coachErr := h.coachService.GetCoachByUserID(userID)
+		if coachErr == nil {
 			trainings, err = h.scheduleService.GetCoachSchedule(coach.ID, startDate, endDate)
 		}
 	} else {
@@ -168,55 +122,474 @@ func (h *Handler) Calendar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Подготавливаем данные для шаблона
-	data := h.prepareTemplateData(view, currentDate, startDate, endDate, trainings, userIDStr, isCoach, userName)
+	// Подготавливаем JSON ответ
+	response := h.prepareCalendarAPIResponse(view, currentDate, startDate, endDate, trainings, userIDStr, isCoach, userName)
 
-	// Загружаем правильный шаблон в зависимости от вида
-	templateName := "calendar_google.html"
-
-	if err := h.templates.ExecuteTemplate(w, templateName, data); err != nil {
-		http.Error(w, "Ошибка рендеринга шаблона: "+err.Error(), http.StatusInternalServerError)
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Ошибка кодирования JSON: "+err.Error(), http.StatusInternalServerError)
 	}
 }
 
-func (h *Handler) prepareTemplateData(view string, currentDate, startDate, endDate time.Time,
-	trainings []models.TrainingSchedule, userIDStr string, isCoach bool, userName string) map[string]interface{} {
+// Структуры для JSON API ответа
+type CalendarAPIResponse struct {
+	View         string              `json:"view"`
+	CurrentDate  string              `json:"current_date"`
+	StartDate    string              `json:"start_date"`
+	EndDate      string              `json:"end_date"`
+	PrevDate     string              `json:"prev_date"`
+	NextDate     string              `json:"next_date"`
+	IsCoach      bool                `json:"is_coach"`
+	UserName     string              `json:"user_name"`
+	UserID       string              `json:"user_id"`
+	WeekDays     []WeekDayHeaderJSON `json:"week_days,omitempty"`
+	CalendarDays []CalendarDayJSON   `json:"calendar_days,omitempty"`
+	WeekDaysData []WeekDayDataJSON   `json:"week_days_data,omitempty"`
+	Events       []CalendarEventJSON `json:"events,omitempty"`
+	TimeSlots    []string            `json:"time_slots,omitempty"`
+	TrainingDays []ScheduleDayJSON   `json:"training_days,omitempty"`
+}
 
-	data := map[string]interface{}{
-		"UserID":      userIDStr,
-		"UserName":    userName,
-		"IsCoach":     isCoach,
-		"View":        view,
-		"CurrentDate": currentDate,
-		"StartDate":   startDate,
-		"EndDate":     endDate,
-		"PrevDate":    h.getPrevDate(view, currentDate),
-		"NextDate":    h.getNextDate(view, currentDate),
+type WeekDayHeaderJSON struct {
+	Name string `json:"name"`
+	Day  string `json:"day"`
+}
+
+type CalendarDayJSON struct {
+	Date         string              `json:"date"`
+	IsToday      bool                `json:"is_today"`
+	IsOtherMonth bool                `json:"is_other_month"`
+	Events       []CalendarEventJSON `json:"events"`
+}
+
+type WeekDayDataJSON struct {
+	Name    string              `json:"name"`
+	Day     int                 `json:"day"`
+	Date    string              `json:"date"`
+	IsToday bool                `json:"is_today"`
+	Events  []CalendarEventJSON `json:"events"`
+}
+
+type CalendarEventJSON struct {
+	ID         int     `json:"id"`
+	Title      string  `json:"title"`
+	Time       string  `json:"time"`
+	Coach      string  `json:"coach"`
+	Top        float64 `json:"top,omitempty"`
+	Height     float64 `json:"height,omitempty"`
+	ColorIndex int     `json:"color_index"`
+	UserID     string  `json:"user_id"`
+}
+
+type ScheduleDayJSON struct {
+	Date      string             `json:"date"`
+	Trainings []TrainingViewJSON `json:"trainings"`
+}
+
+type TrainingViewJSON struct {
+	ID               int    `json:"id"`
+	GroupName        string `json:"group_name"`
+	StartTime        string `json:"start_time"`
+	EndTime          string `json:"end_time"`
+	CoachName        string `json:"coach_name"`
+	Participants     int    `json:"participants"`
+	ParticipantNames string `json:"participant_names"`
+	MaxParticipants  int    `json:"max_participants"`
+	CanRegister      bool   `json:"can_register"`
+	IsRegistered     bool   `json:"is_registered"`
+	IsFull           bool   `json:"is_full"`
+	ColorIndex       int    `json:"color_index"`
+}
+
+func (h *Handler) prepareCalendarAPIResponse(view string, currentDate, startDate, endDate time.Time,
+	trainings []models.TrainingSchedule, userIDStr string, isCoach bool, userName string) CalendarAPIResponse {
+
+	response := CalendarAPIResponse{
+		View:        view,
+		CurrentDate: currentDate.Format("2006-01-02"),
+		StartDate:   startDate.Format("2006-01-02"),
+		EndDate:     endDate.Format("2006-01-02"),
+		PrevDate:    h.getPrevDate(view, currentDate).Format("2006-01-02"),
+		NextDate:    h.getNextDate(view, currentDate).Format("2006-01-02"),
+		IsCoach:     isCoach,
+		UserName:    userName,
+		UserID:      userIDStr,
 	}
 
 	switch view {
 	case "month":
-		data["WeekDays"] = h.getWeekDayHeaders()
-		data["CalendarDays"] = h.prepareMonthView(currentDate, trainings, userIDStr)
+		response.WeekDays = h.getWeekDayHeadersJSON()
+		response.CalendarDays = h.prepareMonthViewJSON(currentDate, trainings, userIDStr)
 
 	case "week":
-		// Для недельного вида
-		weekDays := h.prepareWeekView(startDate, trainings, userIDStr)
-		data["WeekDays"] = weekDays
-		data["TimeSlots"] = h.generateTimeSlots()
+		response.WeekDaysData = h.prepareWeekViewJSON(startDate, trainings, userIDStr)
+		response.TimeSlots = h.generateTimeSlotsJSON()
 
 	case "day":
-		// Для дневного вида
-		data["Events"] = h.prepareDayView(currentDate, trainings, userIDStr)
-		data["TimeSlots"] = h.generateTimeSlots()
+		response.Events = h.prepareDayViewJSON(currentDate, trainings, userIDStr)
+		response.TimeSlots = h.generateTimeSlotsJSON()
 
 	default:
 		// Для спискового вида (schedule)
-		data["TrainingDays"] = h.prepareScheduleView(trainings, userIDStr, isCoach)
+		response.TrainingDays = h.prepareScheduleViewJSON(trainings, userIDStr, isCoach)
 	}
 
-	return data
+	return response
 }
+
+func (h *Handler) getWeekDayHeadersJSON() []WeekDayHeaderJSON {
+	return []WeekDayHeaderJSON{
+		{Name: "ПН", Day: ""},
+		{Name: "ВТ", Day: ""},
+		{Name: "СР", Day: ""},
+		{Name: "ЧТ", Day: ""},
+		{Name: "ПТ", Day: ""},
+		{Name: "СБ", Day: ""},
+		{Name: "ВС", Day: ""},
+	}
+}
+
+func (h *Handler) generateTimeSlotsJSON() []string {
+	var slots []string
+	for hour := 8; hour <= 22; hour++ {
+		slots = append(slots, fmt.Sprintf("%02d:00", hour))
+	}
+	return slots
+}
+
+func (h *Handler) prepareMonthViewJSON(date time.Time, trainings []models.TrainingSchedule, userID string) []CalendarDayJSON {
+	firstDay := time.Date(date.Year(), date.Month(), 1, 0, 0, 0, 0, time.Local)
+
+	// Начинаем с понедельника недели, содержащей первый день
+	weekday := int(firstDay.Weekday())
+	if weekday == 0 {
+		weekday = 7
+	}
+	startDay := firstDay.AddDate(0, 0, -(weekday - 1))
+
+	var days []CalendarDayJSON
+
+	// 6 недель = 42 дня
+	for i := 0; i < 42; i++ {
+		day := startDay.AddDate(0, 0, i)
+
+		dayData := CalendarDayJSON{
+			Date:         day.Format("2006-01-02"),
+			IsToday:      day.Format("2006-01-02") == time.Now().Format("2006-01-02"),
+			IsOtherMonth: day.Month() != date.Month(),
+		}
+
+		// Добавляем тренировки для этого дня
+		var events []CalendarEventJSON
+		for _, training := range trainings {
+			trainingDate := training.TrainingDate.Format("2006-01-02")
+			dayStr := day.Format("2006-01-02")
+
+			if trainingDate == dayStr {
+				events = append(events, CalendarEventJSON{
+					ID:         training.ID,
+					Title:      training.GroupName,
+					Time:       fmt.Sprintf("%s - %s", training.StartTime.Format("15:04"), training.EndTime.Format("15:04")),
+					Coach:      training.CoachName,
+					ColorIndex: h.getColorIndex(training.GroupID),
+					UserID:     userID,
+				})
+			}
+		}
+
+		dayData.Events = events
+		days = append(days, dayData)
+	}
+
+	return days
+}
+
+func (h *Handler) prepareWeekViewJSON(startDate time.Time, trainings []models.TrainingSchedule, userID string) []WeekDayDataJSON {
+	var weekDays []WeekDayDataJSON
+
+	// 7 дней начиная с startDate (должен быть понедельник)
+	for i := 0; i < 7; i++ {
+		day := startDate.AddDate(0, 0, i)
+
+		dayName := ""
+		switch day.Weekday() {
+		case time.Monday:
+			dayName = "Пн"
+		case time.Tuesday:
+			dayName = "Вт"
+		case time.Wednesday:
+			dayName = "Ср"
+		case time.Thursday:
+			dayName = "Чт"
+		case time.Friday:
+			dayName = "Пт"
+		case time.Saturday:
+			dayName = "Сб"
+		case time.Sunday:
+			dayName = "Вс"
+		}
+
+		dayData := WeekDayDataJSON{
+			Name:    dayName,
+			Day:     day.Day(),
+			Date:    day.Format("2006-01-02"),
+			IsToday: day.Format("2006-01-02") == time.Now().Format("2006-01-02"),
+		}
+
+		// Добавляем тренировки для этого дня
+		var events []CalendarEventJSON
+		for _, training := range trainings {
+			trainingDate := training.TrainingDate.Format("2006-01-02")
+			dayStr := day.Format("2006-01-02")
+
+			if trainingDate == dayStr {
+				// Получаем только время (часы и минуты) из time.Time
+				// Приводим к локальному времени для правильного извлечения часов и минут
+				startTime := training.StartTime.In(time.Local)
+				endTime := training.EndTime.In(time.Local)
+
+				// Извлекаем часы и минуты из локального времени
+				startHour := startTime.Hour()
+				startMinute := startTime.Minute()
+				endHour := endTime.Hour()
+				endMinute := endTime.Minute()
+
+				// Рассчитываем позицию и высоту
+				startMinutes := startHour*60 + startMinute
+				endMinutes := endHour*60 + endMinute
+
+				// Начало дня - 8:00 (480 минут), конец - 22:00 (1320 минут)
+				startOfDay := 8 * 60
+				endOfDay := 22 * 60
+
+				// Ограничиваем время рамками дня
+				if startMinutes < startOfDay {
+					startMinutes = startOfDay
+				}
+				if endMinutes > endOfDay {
+					endMinutes = endOfDay
+				}
+				if startMinutes >= endMinutes {
+					startMinutes = startOfDay
+					endMinutes = startOfDay + 60
+				}
+
+				// Позиция относительно 8:00 утра (480 минут)
+				// 1px на минуту = 60px на час
+				top := float64(startMinutes - startOfDay)
+				height := float64(endMinutes - startMinutes)
+
+				// Ограничиваем максимальную позицию (840px = 14 часов * 60px)
+				if top > 840 {
+					top = 840
+				}
+				if height > (840 - top) {
+					height = 840 - top
+				}
+				if height < 30 {
+					height = 30
+				}
+
+				events = append(events, CalendarEventJSON{
+					ID:         training.ID,
+					Title:      training.GroupName,
+					Time:       fmt.Sprintf("%02d:%02d - %02d:%02d", startHour, startMinute, endHour, endMinute),
+					Coach:      training.CoachName,
+					Top:        top,
+					Height:     height,
+					ColorIndex: h.getColorIndex(training.GroupID),
+					UserID:     userID,
+				})
+			}
+		}
+
+		dayData.Events = events
+		weekDays = append(weekDays, dayData)
+	}
+
+	return weekDays
+}
+
+func (h *Handler) prepareDayViewJSON(date time.Time, trainings []models.TrainingSchedule, userID string) []CalendarEventJSON {
+	var events []CalendarEventJSON
+
+	dateStr := date.Format("2006-01-02")
+
+	for _, training := range trainings {
+		trainingDate := training.TrainingDate.Format("2006-01-02")
+
+		if trainingDate == dateStr {
+			// Получаем только время (часы и минуты) из time.Time
+			// Приводим к локальному времени для правильного извлечения часов и минут
+			startTime := training.StartTime.In(time.Local)
+			endTime := training.EndTime.In(time.Local)
+
+			// Извлекаем часы и минуты из локального времени
+			startHour := startTime.Hour()
+			startMinute := startTime.Minute()
+			endHour := endTime.Hour()
+			endMinute := endTime.Minute()
+
+			// Рассчитываем позицию и высоту
+			startMinutes := startHour*60 + startMinute
+			endMinutes := endHour*60 + endMinute
+
+			// Начало дня - 8:00 (480 минут), конец - 22:00 (1320 минут)
+			startOfDay := 8 * 60
+			endOfDay := 22 * 60
+
+			// Ограничиваем время рамками дня
+			if startMinutes < startOfDay {
+				startMinutes = startOfDay
+			}
+			if endMinutes > endOfDay {
+				endMinutes = endOfDay
+			}
+			if startMinutes >= endMinutes {
+				startMinutes = startOfDay
+				endMinutes = startOfDay + 60
+			}
+
+			// Позиция относительно 8:00 утра (480 минут)
+			// 1px на минуту = 60px на час
+			top := float64(startMinutes - startOfDay)
+			height := float64(endMinutes - startMinutes)
+
+			// Ограничиваем максимальную позицию (840px = 14 часов * 60px)
+			if top > 840 {
+				top = 840
+			}
+			if height > (840 - top) {
+				height = 840 - top
+			}
+			if height < 30 {
+				height = 30
+			}
+
+			events = append(events, CalendarEventJSON{
+				ID:         training.ID,
+				Title:      training.GroupName,
+				Time:       fmt.Sprintf("%02d:%02d - %02d:%02d", startHour, startMinute, endHour, endMinute),
+				Coach:      training.CoachName,
+				Top:        top,
+				Height:     height,
+				ColorIndex: h.getColorIndex(training.GroupID),
+				UserID:     userID,
+			})
+		}
+	}
+
+	// Сортируем события по времени начала
+	sort.Slice(events, func(i, j int) bool {
+		// Парсим время из строки "HH:MM - HH:MM"
+		timeI := events[i].Time
+		timeJ := events[j].Time
+
+		// Извлекаем время начала
+		partsI := strings.Split(timeI, " - ")
+		partsJ := strings.Split(timeJ, " - ")
+
+		if len(partsI) > 0 && len(partsJ) > 0 {
+			return partsI[0] < partsJ[0]
+		}
+		return false
+	})
+
+	return events
+}
+
+func (h *Handler) prepareScheduleViewJSON(trainings []models.TrainingSchedule, userID string, isCoach bool) []ScheduleDayJSON {
+	// Группируем по дням
+	grouped := make(map[string][]TrainingViewJSON)
+
+	for _, training := range trainings {
+		dateKey := training.TrainingDate.Format("2006-01-02")
+		participants, _ := h.attendanceService.GetParticipants(training.ID)
+
+		// Формируем строку с именами участников
+		var participantNames string
+		if len(participants) > 0 {
+			var names []string
+			for _, p := range participants {
+				names = append(names, p.StudentName)
+			}
+			if len(names) > 3 {
+				participantNames = strings.Join(names[:3], ", ") + " и ещё " + strconv.Itoa(len(names)-3)
+			} else {
+				participantNames = strings.Join(names, ", ")
+			}
+		}
+
+		// Проверяем запись пользователя
+		isRegistered := false
+		canRegister := false
+
+		if !isCoach && userID != "" {
+			userIDInt, _ := strconv.ParseInt(userID, 10, 64)
+			student, err := h.studentService.GetStudentByUserID(userIDInt)
+			if err == nil {
+				att, _ := h.attendanceService.GetStudentAttendanceForTraining(int(student.ID), training.ID)
+				isRegistered = att != nil && att.Status == "registered"
+
+				// Проверяем, можно ли записаться
+				if !isRegistered && training.TrainingDate.After(time.Now()) {
+					if training.MaxParticipants != nil && *training.MaxParticipants > 0 {
+						maxParticipants := *training.MaxParticipants
+						if len(participants) < maxParticipants {
+							canRegister = true
+						}
+					} else {
+						canRegister = true
+					}
+				}
+			}
+		}
+
+		maxParticipants := 0
+		if training.MaxParticipants != nil {
+			maxParticipants = *training.MaxParticipants
+		}
+
+		grouped[dateKey] = append(grouped[dateKey], TrainingViewJSON{
+			ID:               training.ID,
+			GroupName:        training.GroupName,
+			StartTime:        training.StartTime.Format("15:04"),
+			EndTime:          training.EndTime.Format("15:04"),
+			CoachName:        training.CoachName,
+			Participants:     len(participants),
+			ParticipantNames: participantNames,
+			MaxParticipants:  maxParticipants,
+			CanRegister:      canRegister,
+			IsRegistered:     isRegistered,
+			IsFull:           training.MaxParticipants != nil && len(participants) >= *training.MaxParticipants,
+			ColorIndex:       h.getColorIndex(training.GroupID),
+		})
+	}
+
+	// Преобразуем в массив и сортируем по дате
+	var scheduleDays []ScheduleDayJSON
+	for dateStr, trainings := range grouped {
+		date, _ := time.Parse("2006-01-02", dateStr)
+
+		// Форматируем дату
+		formattedDate := date.Format("Monday, 2 January 2006")
+		today := time.Now()
+		if date.Format("2006-01-02") == today.Format("2006-01-02") {
+			formattedDate = "Сегодня, " + date.Format("2 January")
+		} else if date.Format("2006-01-02") == today.AddDate(0, 0, 1).Format("2006-01-02") {
+			formattedDate = "Завтра, " + date.Format("2 January")
+		}
+
+		scheduleDays = append(scheduleDays, ScheduleDayJSON{
+			Date:      formattedDate,
+			Trainings: trainings,
+		})
+	}
+
+	return scheduleDays
+}
+
+// prepareTemplateData method removed - теперь используется prepareCalendarAPIResponse для JSON API
 
 func (h *Handler) getPrevDate(view string, date time.Time) time.Time {
 	switch view {

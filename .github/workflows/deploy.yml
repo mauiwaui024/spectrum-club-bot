@@ -41,6 +41,9 @@ jobs:
       run: |
         docker build -t spectrum-club-bot:${{ github.sha }} -f ./docker/Dockerfile .
         docker save spectrum-club-bot:${{ github.sha }} | gzip > bot-image.tar.gz
+      env:
+        DOCKER_BUILDKIT: 1
+        BUILDKIT_PROGRESS: plain
 
     - name: 📝 Create .env file locally
       run: |

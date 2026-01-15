@@ -1,0 +1,58 @@
+# Git
+.git
+.gitignore
+.github
+
+# Documentation
+*.md
+README.md
+Documentation.md
+todo.md
+
+# Node modules (устанавливаются в контейнере)
+node_modules/
+frontend/node_modules/
+
+# Angular build artifacts (собирается в контейнере)
+frontend/dist/
+frontend/.angular/
+
+# Go build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+bin/
+__debug_bin*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.local.yml
+*.tar.gz
+
+# Temporary files
+tmp/
+temp/
+*.tmp

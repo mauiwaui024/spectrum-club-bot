@@ -159,8 +159,6 @@ func (b *Bot) handleSubscriptionSelectionForDeletion(chatID int64, messageText s
 	b.showDeletionConfirmation(chatID, session.SelectedStudentForDeletion, selectedSubscription)
 }
 
-// Остальные функции остаются без изменений
-
 func (b *Bot) showDeletionConfirmation(chatID int64, student *models.User, subscription *models.Subscription) {
 	var status string
 	if subscription.RemainingLessons <= 0 {

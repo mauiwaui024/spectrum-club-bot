@@ -90,23 +90,44 @@ func main() {
 	// Настраиваем HTTP сервер
 	mux := http.NewServeMux()
 
-	// Статические файлы для шаблонов
-	fs := http.FileServer(http.Dir("web/templates/static"))
-	mux.Handle("/static/", http.StripPrefix("/static/", fs))
-
-	// Calendar routes
+	// API endpoints (должны быть перед статикой)
 	mux.HandleFunc("/api/training/", calendarHandler.TrainingDetailsAPI)
-	// mux.HandleFunc("/api/training", calendarHandler.TrainingDetailsAPI)
-	mux.HandleFunc("/", calendarHandler.Calendar)
-	mux.HandleFunc("/calendar", calendarHandler.Calendar)
-	mux.HandleFunc("/my-calendar", calendarHandler.Calendar) // Alias for student view
-	mux.HandleFunc("/check-registration", calendarHandler.CheckRegistration)
+	mux.HandleFunc("/api/calendar", calendarHandler.CalendarAPI)
+	mux.HandleFunc("/api/check-registration", calendarHandler.CheckRegistration)
+	mux.HandleFunc("/api/register", calendarHandler.RegisterForTraining)
+	mux.HandleFunc("/api/cancel", calendarHandler.CancelRegistration)
 
-	// API endpoints
-
-	// Registration endpoints
-	mux.HandleFunc("/register", calendarHandler.RegisterForTraining)
-	mux.HandleFunc("/cancel", calendarHandler.CancelRegistration)
+	// Статические файлы Angular (для production)
+	// В development Angular dev server будет на порту 4200
+	angularDir := http.Dir("frontend/dist/spectrum-club-calendar/browser")
+	angularFS := http.FileServer(angularDir)
+	
+	// Раздаем статические файлы Angular
+	// Для SPA: все запросы, кроме API, возвращают index.html
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		// Проверяем, существует ли файл
+		path := r.URL.Path
+		if path == "/" {
+			path = "/index.html"
+		}
+		
+		file, err := angularDir.Open(path)
+		if err != nil {
+			// Файл не найден - возвращаем index.html для SPA роутинга
+			indexFile, err := angularDir.Open("/index.html")
+			if err != nil {
+				http.NotFound(w, r)
+				return
+			}
+			defer indexFile.Close()
+			http.ServeContent(w, r, "index.html", time.Time{}, indexFile)
+			return
+		}
+		defer file.Close()
+		
+		// Файл существует - отдаем его
+		angularFS.ServeHTTP(w, r)
+	})
 	srv := &http.Server{
 		Addr:    ":" + cfg.HTTPPort,
 		Handler: mux,
