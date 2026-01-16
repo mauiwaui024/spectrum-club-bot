@@ -1421,12 +1421,20 @@ func (h *Handler) MarkAttendanceAPI(w http.ResponseWriter, r *http.Request) {
 		attendedSet[studentID] = true
 	}
 
+	// Логирование для отладки
+	log.Printf("[MarkAttendanceAPI] Получено student_ids для отметки: %v", requestData.StudentIDs)
+	log.Printf("[MarkAttendanceAPI] Всего участников: %d", len(participants))
+
 	// Отмечаем посещаемость для всех записавшихся
 	markedCount := 0
 	for _, participant := range participants {
 		// participant.StudentID это int из структуры Attendance
 		studentID := participant.StudentID
 		attended := attendedSet[studentID]
+
+		log.Printf("[MarkAttendanceAPI] Участник ID=%d, studentID=%d, attended=%v (в attendedSet: %v)",
+			participant.ID, studentID, attended, attendedSet[studentID])
+
 		err := h.attendanceService.MarkAttendance(
 			requestData.TrainingID,
 			studentID,

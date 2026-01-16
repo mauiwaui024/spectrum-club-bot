@@ -214,17 +214,23 @@ func (r *attendanceRepository) GetStudentAttendanceForTraining(studentID, traini
 }
 
 func (r *attendanceRepository) UpdateAttendance(attendance *models.Attendance) error {
+	// Логирование для отладки
+	fmt.Printf("[UpdateAttendance] Обновление записи: id=%d, attended=%v, notes=%s, recorded_by=%v\n",
+		attendance.ID, attendance.Attended, attendance.Notes, attendance.RecordedBy)
+
 	query := `
 		UPDATE spectrum.attendance 
 		SET 
-			attended = COALESCE($1::boolean, attended),
+			attended = $1,
 			notes = COALESCE(NULLIF($2, ''), notes),
 			recorded_by = COALESCE($3, recorded_by),
 			recorded_at = COALESCE($4, recorded_at),
 			updated_at = CURRENT_TIMESTAMP
 		WHERE id = $5
-		RETURNING recorded_at, updated_at
+		RETURNING recorded_at, updated_at, attended
 	`
+
+	var returnedAttended bool
 	err := r.db.QueryRow(
 		query,
 		attendance.Attended,
@@ -232,11 +238,14 @@ func (r *attendanceRepository) UpdateAttendance(attendance *models.Attendance) e
 		attendance.RecordedBy,
 		attendance.RecordedAt,
 		attendance.ID,
-	).Scan(&attendance.RecordedAt, &attendance.UpdatedAt)
+	).Scan(&attendance.RecordedAt, &attendance.UpdatedAt, &returnedAttended)
 
 	if err != nil {
 		return fmt.Errorf("ошибка обновления посещаемости: %w", err)
 	}
+
+	fmt.Printf("[UpdateAttendance] Успешно обновлено: id=%d, attended в БД=%v (ожидалось %v)\n",
+		attendance.ID, returnedAttended, attendance.Attended)
 
 	return nil
 }

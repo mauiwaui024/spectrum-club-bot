@@ -101,11 +101,17 @@ func (s *attendanceService) MarkAttendance(trainingID, studentID, recordedBy int
 	attendance.RecordedBy = &recordedBy
 	attendance.RecordedAt = time.Now()
 
+	// Логирование для отладки
+	fmt.Printf("[MarkAttendance] Обновление посещаемости: trainingID=%d, studentID=%d, attended=%v, attendance.ID=%d\n",
+		trainingID, studentID, attended, attendance.ID)
+
 	// Обновляем запись в БД
 	err = s.attendanceRepo.UpdateAttendance(attendance)
 	if err != nil {
 		return fmt.Errorf("ошибка обновления посещаемости в БД: %w", err)
 	}
+
+	fmt.Printf("[MarkAttendance] Посещаемость успешно обновлена для studentID=%d, attended=%v\n", studentID, attended)
 
 	return nil
 }
