@@ -216,7 +216,12 @@ func (r *attendanceRepository) GetStudentAttendanceForTraining(studentID, traini
 func (r *attendanceRepository) UpdateAttendance(attendance *models.Attendance) error {
 	query := `
 		UPDATE spectrum.attendance 
-		SET attended = $1, notes = $2, recorded_by = $3, recorded_at = $4, updated_at = CURRENT_TIMESTAMP
+		SET 
+			attended = COALESCE($1::boolean, attended),
+			notes = COALESCE(NULLIF($2, ''), notes),
+			recorded_by = COALESCE($3, recorded_by),
+			recorded_at = COALESCE($4, recorded_at),
+			updated_at = CURRENT_TIMESTAMP
 		WHERE id = $5
 		RETURNING recorded_at, updated_at
 	`
@@ -228,11 +233,11 @@ func (r *attendanceRepository) UpdateAttendance(attendance *models.Attendance) e
 		attendance.RecordedAt,
 		attendance.ID,
 	).Scan(&attendance.RecordedAt, &attendance.UpdatedAt)
-	
+
 	if err != nil {
 		return fmt.Errorf("ошибка обновления посещаемости: %w", err)
 	}
-	
+
 	return nil
 }
 
