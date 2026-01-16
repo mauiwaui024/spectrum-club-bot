@@ -64,12 +64,32 @@ export class CalendarService {
     // Обновляем initData перед каждым запросом (на случай, если он появился позже)
     this.updateInitData();
     
+    // Дополнительная проверка: получаем initData напрямую из Telegram WebApp
+    let currentInitData = this.initData;
+    try {
+      const tg = (window as any).Telegram?.WebApp;
+      if (tg && tg.initData) {
+        currentInitData = tg.initData;
+        // Обновляем кэш
+        this.initData = currentInitData;
+      }
+    } catch (e) {
+      // ignore
+    }
+    
     const headers = new HttpHeaders();
-    if (this.initData) {
-      console.log('📤 Отправка запроса с initData (длина:', this.initData.length + ')');
-      return headers.set('X-Telegram-Init-Data', this.initData);
+    if (currentInitData && currentInitData.length > 0) {
+      console.log('📤 Отправка запроса с initData (длина:', currentInitData.length + ')');
+      console.log('📤 initData (первые 100 символов):', currentInitData.substring(0, 100));
+      return headers.set('X-Telegram-Init-Data', currentInitData);
     } else {
       console.warn('⚠️ Отправка запроса БЕЗ initData!');
+      console.warn('⚠️ Проверка Telegram WebApp:', {
+        available: !!(window as any).Telegram?.WebApp,
+        initData: (window as any).Telegram?.WebApp?.initData || 'null',
+        initDataLength: (window as any).Telegram?.WebApp?.initData?.length || 0,
+        ready: (window as any).Telegram?.WebApp?.ready || false
+      });
     }
     return headers;
   }

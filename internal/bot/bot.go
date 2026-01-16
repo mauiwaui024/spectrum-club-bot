@@ -5,6 +5,7 @@ import (
 	"log"
 	"spectrum-club-bot/internal/models/config"
 	"spectrum-club-bot/internal/service"
+	"strings"
 	"sync"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
@@ -55,6 +56,18 @@ func NewBot(
 			return nil, fmt.Errorf("Пустая ссылка для webview")
 		}
 		webBaseURL = cfg.BaseURL // Укажите ваш домен
+		
+		// ВАЖНО: Для Telegram WebApp нужен HTTPS URL!
+		// Если URL не начинается с http:// или https://, добавляем https://
+		if !strings.HasPrefix(webBaseURL, "http://") && !strings.HasPrefix(webBaseURL, "https://") {
+			webBaseURL = "https://" + webBaseURL
+			log.Printf("⚠️  URL не содержал протокол, добавлен https://")
+		}
+		
+		// Проверяем, что используется HTTPS (Telegram WebApp требует HTTPS для передачи initData)
+		if strings.HasPrefix(webBaseURL, "http://") && !strings.Contains(webBaseURL, "localhost") {
+			log.Printf("⚠️  ВНИМАНИЕ: Используется HTTP вместо HTTPS! Telegram WebApp может не передавать initData для HTTP URL.")
+		}
 	}
 	log.Printf("🤖 URL календаря : %s", webBaseURL)
 	log.Printf("🤖 Бот инициализирован: %s (debug: %v)", api.Self.UserName, cfg.Debug)
