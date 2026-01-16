@@ -65,6 +65,27 @@ export class CalendarComponent implements OnInit {
     // Обновляем initData при инициализации компонента
     this.calendarService.updateInitData();
     
+    // Проверяем наличие initData после небольшой задержки (для WebApp инициализации)
+    setTimeout(() => {
+      const tg = (window as any).Telegram?.WebApp;
+      if (tg) {
+        const hasInitData = tg.initData && tg.initData.length > 0;
+        console.log('🔍 Проверка initData при загрузке календаря:', {
+          hasInitData,
+          initDataLength: tg.initData?.length || 0,
+          platform: tg.platform || 'unknown',
+          version: tg.version || 'unknown',
+          ready: tg.ready || false
+        });
+        
+        if (hasInitData) {
+          console.log('✅ initData успешно получен через WebApp кнопку!');
+        } else {
+          console.warn('⚠️ initData пустой. Убедитесь, что страница открыта через WebApp кнопку в Telegram боте.');
+        }
+      }
+    }, 1000);
+    
     this.route.queryParams.subscribe(params => {
       const viewParam = params['view'] || 'month';
       const date = params['date'] || null;
