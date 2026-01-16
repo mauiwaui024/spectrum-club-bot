@@ -1432,10 +1432,14 @@ func (h *Handler) MarkAttendanceAPI(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
+		// recorded_by должен ссылаться на user_id, а не на coach.id
+		// Преобразуем userID в int (userID уже получен из getUserIDFromRequest)
+		recordedByUserID := int(userID)
+
 		err := h.attendanceService.MarkAttendance(
 			requestData.TrainingID,
 			studentID,
-			int(coach.ID),
+			recordedByUserID,
 			true, // Всегда true, так как мы обрабатываем только выбранных
 			"",
 		)
