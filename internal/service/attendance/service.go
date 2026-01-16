@@ -96,10 +96,13 @@ func (s *attendanceService) MarkAttendance(trainingID, studentID, recordedBy int
 	// Логирование для отладки
 	fmt.Printf("[MarkAttendance] Обновление посещаемости: trainingID=%d, studentID=%d, attended=%v (было %v), attendance.ID=%d\n",
 		trainingID, studentID, attended, oldAttended, attendance.ID)
+	fmt.Printf("[MarkAttendance] attendance объект перед UpdateAttendance: ID=%d, Attended=%v, Notes=%s, RecordedBy=%v\n",
+		attendance.ID, attendance.Attended, attendance.Notes, attendance.RecordedBy)
 
 	// ВАЖНО: Сначала обновляем attendance в БД
 	err = s.attendanceRepo.UpdateAttendance(attendance)
 	if err != nil {
+		fmt.Printf("[MarkAttendance] ОШИБКА при обновлении в БД: %v\n", err)
 		return fmt.Errorf("ошибка обновления посещаемости в БД: %w", err)
 	}
 

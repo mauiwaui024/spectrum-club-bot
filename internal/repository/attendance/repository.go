@@ -179,19 +179,14 @@ func (r *attendanceRepository) GetStudentAttendanceForTraining(studentID, traini
 
 	attendance := &models.Attendance{}
 
-	// Для отладки: сначала проверим структуру
-	rows, err := r.db.Query("SELECT * FROM spectrum.attendance LIMIT 1")
-	if err == nil {
-		// cols, _ := rows.Columns()
-		// fmt.Printf("Колонки в таблице attendance: %v\n", cols)
-		rows.Close()
-	}
+	// Используем sql.NullBool для правильной обработки NULL значений
+	var attendedNull sql.NullBool
 
-	err = r.db.QueryRow(query, studentID, trainingID).Scan(
+	err := r.db.QueryRow(query, studentID, trainingID).Scan(
 		&attendance.ID,
 		&attendance.TrainingID,
 		&attendance.StudentID,
-		&attendance.Attended,
+		&attendedNull,
 		&attendance.Notes,
 		&attendance.RecordedBy,
 		&attendance.RecordedAt,
@@ -210,6 +205,12 @@ func (r *attendanceRepository) GetStudentAttendanceForTraining(studentID, traini
 		return nil, err
 	}
 
+	// Преобразуем sql.NullBool в bool (если NULL, то false)
+	attendance.Attended = attendedNull.Bool
+	if !attendedNull.Valid {
+		fmt.Printf("[GetStudentAttendanceForTraining] attended был NULL для id=%d, устанавливаем false\n", attendance.ID)
+	}
+
 	return attendance, nil
 }
 
@@ -223,30 +224,64 @@ func (r *attendanceRepository) UpdateAttendance(attendance *models.Attendance) e
 	fmt.Printf("[UpdateAttendance] Обновление записи: id=%d, attended=%v, notes=%s, recorded_by=%v\n",
 		attendance.ID, attendance.Attended, attendance.Notes, attendance.RecordedBy)
 
+	// Сначала проверим текущее значение в БД
+	var currentAttended sql.NullBool
+	checkQuery := `SELECT attended FROM spectrum.attendance WHERE id = $1`
+	err := r.db.QueryRow(checkQuery, attendance.ID).Scan(&currentAttended)
+	if err != nil {
+		fmt.Printf("[UpdateAttendance] Ошибка проверки текущего значения: %v\n", err)
+	} else {
+		fmt.Printf("[UpdateAttendance] Текущее значение в БД: attended=%v (valid=%v)\n",
+			currentAttended.Bool, currentAttended.Valid)
+	}
+
+	// Используем Exec с проверкой количества обновленных строк
 	query := `
 		UPDATE spectrum.attendance 
 		SET 
-			attended = $1,
+			attended = $1::boolean,
 			notes = COALESCE(NULLIF($2, ''), notes),
 			recorded_by = COALESCE($3, recorded_by),
 			recorded_at = COALESCE($4, recorded_at),
 			updated_at = CURRENT_TIMESTAMP
 		WHERE id = $5
-		RETURNING recorded_at, updated_at, attended
 	`
 
-	var returnedAttended bool
-	err := r.db.QueryRow(
+	result, err := r.db.Exec(
 		query,
 		attendance.Attended,
 		attendance.Notes,
 		attendance.RecordedBy,
 		attendance.RecordedAt,
 		attendance.ID,
-	).Scan(&attendance.RecordedAt, &attendance.UpdatedAt, &returnedAttended)
+	)
 
 	if err != nil {
-		return fmt.Errorf("ошибка обновления посещаемости: %w", err)
+		return fmt.Errorf("ошибка выполнения UPDATE запроса: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("ошибка получения количества обновленных строк: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("не найдена запись с id=%d для обновления", attendance.ID)
+	}
+
+	fmt.Printf("[UpdateAttendance] Обновлено строк: %d для id=%d\n", rowsAffected, attendance.ID)
+
+	// Проверяем, что значение действительно обновилось, делая SELECT
+	verifyQuery := `SELECT attended, recorded_at, updated_at FROM spectrum.attendance WHERE id = $1`
+	var returnedAttended bool
+	err = r.db.QueryRow(verifyQuery, attendance.ID).Scan(
+		&returnedAttended,
+		&attendance.RecordedAt,
+		&attendance.UpdatedAt,
+	)
+
+	if err != nil {
+		return fmt.Errorf("ошибка проверки обновленного значения: %w", err)
 	}
 
 	// Проверка, что значение действительно обновилось
