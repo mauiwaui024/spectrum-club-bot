@@ -94,4 +94,6 @@ export interface Participant {
   student_id: number;
   student_name: string;
   created_at: string;
+  attended?: boolean;
+  status?: string;
 }

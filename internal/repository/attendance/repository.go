@@ -240,6 +240,10 @@ func (r *attendanceRepository) UpdateAttendance(attendance *models.Attendance) e
 		UPDATE spectrum.attendance 
 		SET 
 			attended = $1::boolean,
+			status = CASE 
+				WHEN $1 = true THEN 'attended'
+				ELSE status
+			END,
 			notes = COALESCE(NULLIF($2, ''), notes),
 			recorded_by = COALESCE($3, recorded_by),
 			recorded_at = COALESCE($4, recorded_at),
@@ -334,6 +338,7 @@ func (r *attendanceRepository) GetParticipants(trainingID int) ([]models.Attenda
             a.training_id, 
             a.student_id, 
             a.status,
+            a.attended,
             a.notes,
             a.created_at,
             a.updated_at,
@@ -359,6 +364,7 @@ func (r *attendanceRepository) GetParticipants(trainingID int) ([]models.Attenda
 			&participant.TrainingID,
 			&participant.StudentID,
 			&participant.Status,
+			&participant.Attended,
 			&participant.Notes,
 			&participant.CreatedAt,
 			&participant.UpdatedAt,

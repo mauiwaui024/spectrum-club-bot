@@ -127,25 +127,32 @@
                 Отмена
               </button>
             </div>
-            <div class="attendance-list">
-              <div *ngFor="let participant of selectedTraining.participants" class="attendance-item" 
-                   [style.background-color]="isSelectingAttendance && isStudentSelected(participant.student_id) ? '#e8f5e9' : 'transparent'">
-                <div *ngIf="isSelectingAttendance" style="margin-right: 10px;">
-                  <input 
-                    type="checkbox" 
-                    [checked]="isStudentSelected(participant.student_id)"
-                    (change)="toggleStudentSelection(participant.student_id)"
-                    style="width: 18px; height: 18px; cursor: pointer;">
-                </div>
-                <div class="attendance-avatar">
-                  {{ participant.student_name ? participant.student_name.charAt(0).toUpperCase() : '?' }}
-                </div>
-                <div style="flex: 1;">
-                  <div class="attendance-name">{{ participant.student_name || 'Неизвестный' }}</div>
-                  <div class="attendance-time">Записан: {{ formatDateTime(participant.created_at) }}</div>
-                </div>
-              </div>
-            </div>
+         <div class="attendance-list">
+           <div *ngFor="let participant of selectedTraining.participants" class="attendance-item"
+                [style.background-color]="isSelectingAttendance && isStudentSelected(participant.student_id) ? '#e8f5e9' : (isAlreadyAttended(participant) ? '#f0f0f0' : 'transparent')"
+                [style.opacity]="isAlreadyAttended(participant) ? '0.7' : '1'">
+             <div *ngIf="isSelectingAttendance && !isAlreadyAttended(participant)" style="margin-right: 10px;">
+               <input
+                 type="checkbox"
+                 [checked]="isStudentSelected(participant.student_id)"
+                 (change)="toggleStudentSelection(participant.student_id)"
+                 style="width: 18px; height: 18px; cursor: pointer;">
+             </div>
+             <div *ngIf="isSelectingAttendance && isAlreadyAttended(participant)" style="margin-right: 10px; color: #4caf50; font-weight: bold;">
+               ✓
+             </div>
+             <div class="attendance-avatar">
+               {{ participant.student_name ? participant.student_name.charAt(0).toUpperCase() : '?' }}
+             </div>
+             <div style="flex: 1;">
+               <div class="attendance-name">
+                 {{ participant.student_name || 'Неизвестный' }}
+                 <span *ngIf="isAlreadyAttended(participant)" style="color: #4caf50; font-weight: bold; margin-left: 8px;">✓ Отмечено</span>
+               </div>
+               <div class="attendance-time">Записан: {{ formatDateTime(participant.created_at) }}</div>
+             </div>
+           </div>
+         </div>
           </div>
           
           <div class="modal-actions" style="margin-top: 20px;">

@@ -422,15 +422,23 @@ export class CalendarComponent implements OnInit {
   toggleAttendanceSelection() {
     this.isSelectingAttendance = !this.isSelectingAttendance;
     if (this.isSelectingAttendance && this.selectedTraining) {
-      // При включении режима выбираем всех участников
+      // При включении режима выбираем только тех участников, у которых еще не отмечена посещаемость
       this.selectedStudents.clear();
       this.selectedTraining.participants.forEach(participant => {
-        this.selectedStudents.add(participant.student_id);
+        const isAlreadyAttended = participant.attended || participant.status === 'attended';
+        if (!isAlreadyAttended) {
+          this.selectedStudents.add(participant.student_id);
+        }
       });
     } else {
       // При выключении очищаем выбор
       this.selectedStudents.clear();
     }
+  }
+
+  // Проверка, отмечена ли уже посещаемость для участника
+  isAlreadyAttended(participant: any): boolean {
+    return participant.attended === true || participant.status === 'attended';
   }
   
   // Переключение выбора конкретного ученика
@@ -451,8 +459,33 @@ export class CalendarComponent implements OnInit {
   confirmAttendance() {
     if (!this.selectedTraining) return;
     
+    // Проверяем, что выбранные ученики еще не имеют отмеченной посещаемости
+    const alreadyAttendedStudents: string[] = [];
+    this.selectedStudents.forEach(studentId => {
+      const participant = this.selectedTraining?.participants.find(p => p.student_id === studentId);
+      if (participant && this.isAlreadyAttended(participant)) {
+        alreadyAttendedStudents.push(participant.student_name || `Ученик ${studentId}`);
+      }
+    });
+
+    if (alreadyAttendedStudents.length > 0) {
+      alert('Невозможно отметить посещаемость для следующих учеников, так как она уже была отмечена:\n' + alreadyAttendedStudents.join('\n'));
+      // Удаляем уже отмеченных из выбранных
+      alreadyAttendedStudents.forEach(() => {
+        // Находим и удаляем из selectedStudents
+        this.selectedTraining?.participants.forEach(p => {
+          if (this.isAlreadyAttended(p)) {
+            this.selectedStudents.delete(p.student_id);
+          }
+        });
+      });
+      if (this.selectedStudents.size === 0) {
+        return;
+      }
+    }
+    
     if (this.selectedStudents.size === 0) {
-      alert('Выберите хотя бы одного ученика');
+      alert('Выберите хотя бы одного ученика, у которого еще не отмечена посещаемость');
       return;
     }
     

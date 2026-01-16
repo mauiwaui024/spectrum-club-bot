@@ -83,12 +83,20 @@ func (s *attendanceService) MarkAttendance(trainingID, studentID, recordedBy int
 		return errors.New("студент не записан на эту тренировку")
 	}
 
+	// Проверяем, что посещаемость еще не была отмечена
+	if attended && (attendance.Status == "attended" || attendance.Attended) {
+		return fmt.Errorf("посещаемость уже была отмечена для этого ученика")
+	}
+
 	// Сохраняем старое значение для проверки необходимости списания абонемента
 	oldAttended := attendance.Attended
 	needsSubscriptionDeduction := attended && !oldAttended
 
 	// Обновляем поля посещаемости
 	attendance.Attended = attended
+	if attended {
+		attendance.Status = "attended"
+	}
 	attendance.Notes = notes
 	attendance.RecordedBy = &recordedBy
 	attendance.RecordedAt = time.Now()
