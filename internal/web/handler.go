@@ -1413,8 +1413,11 @@ func (h *Handler) MarkAttendanceAPI(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[MarkAttendanceAPI] Получено student_ids для отметки: %v", requestData.StudentIDs)
 	log.Printf("[MarkAttendanceAPI] Всего участников: %d", len(participants))
 
-	// Отмечаем посещаемость для всех записавшихся
+	// Отмечаем посещаемость только для выбранных учеников
 	markedCount := 0
+	failedStudents := []map[string]interface{}{}
+	errors := []string{}
+
 	for _, participant := range participants {
 		// participant.StudentID это int из структуры Attendance
 		studentID := participant.StudentID
@@ -1423,32 +1426,58 @@ func (h *Handler) MarkAttendanceAPI(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[MarkAttendanceAPI] Участник ID=%d, studentID=%d, attended=%v (в attendedSet: %v)",
 			participant.ID, studentID, attended, attendedSet[studentID])
 
+		// Обновляем только выбранных учеников (attended = true)
+		if !attended {
+			log.Printf("[MarkAttendanceAPI] Ученик %d не выбран, пропускаем", studentID)
+			continue
+		}
+
 		err := h.attendanceService.MarkAttendance(
 			requestData.TrainingID,
 			studentID,
 			int(coach.ID),
-			attended,
+			true, // Всегда true, так как мы обрабатываем только выбранных
 			"",
 		)
 		if err != nil {
 			log.Printf("[MarkAttendanceAPI] Ошибка отметки посещаемости для ученика %d: %v", studentID, err)
-			// Продолжаем обработку остальных учеников
+			failedStudents = append(failedStudents, map[string]interface{}{
+				"student_id":   studentID,
+				"student_name": participant.StudentName,
+				"error":        err.Error(),
+			})
+			errors = append(errors, fmt.Sprintf("Ученик %s: %v", participant.StudentName, err))
 			continue
 		}
-		if attended {
-			markedCount++
-		}
+		markedCount++
+		log.Printf("[MarkAttendanceAPI] Посещаемость успешно отмечена для ученика %d", studentID)
 	}
 
-	// Формируем ответ
+	// Формируем ответ с информацией об ошибках
 	response := map[string]interface{}{
-		"success":      true,
-		"message":      "Посещаемость подтверждена",
-		"marked_count": markedCount,
-		"total_count":  len(participants),
+		"success":         len(failedStudents) == 0,
+		"marked_count":    markedCount,
+		"total_count":     len(participants),
+		"failed_count":    len(failedStudents),
+		"failed_students": failedStudents,
 	}
 
+	if len(failedStudents) > 0 {
+		response["errors"] = errors
+		response["message"] = fmt.Sprintf("Посещаемость подтверждена для %d из %d учеников", markedCount, len(participants))
+		log.Printf("[MarkAttendanceAPI] Частичный успех: отмечено %d, ошибок %d", markedCount, len(failedStudents))
+	} else {
+		response["message"] = "Посещаемость подтверждена"
+		log.Printf("[MarkAttendanceAPI] Успешно отмечено %d учеников", markedCount)
+	}
+
+	// Устанавливаем HTTP статус
 	w.Header().Set("Content-Type", "application/json")
+	if len(failedStudents) > 0 {
+		w.WriteHeader(http.StatusPartialContent) // 206 - частичный успех
+	} else {
+		w.WriteHeader(http.StatusOK)
+	}
 	json.NewEncoder(w).Encode(response)
 }
 

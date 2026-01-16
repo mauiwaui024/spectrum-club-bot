@@ -273,9 +273,9 @@ func (r *attendanceRepository) UpdateAttendance(attendance *models.Attendance) e
 
 	// Проверяем, что значение действительно обновилось, делая SELECT
 	verifyQuery := `SELECT attended, recorded_at, updated_at FROM spectrum.attendance WHERE id = $1`
-	var returnedAttended bool
+	var returnedAttendedNull sql.NullBool
 	err = r.db.QueryRow(verifyQuery, attendance.ID).Scan(
-		&returnedAttended,
+		&returnedAttendedNull,
 		&attendance.RecordedAt,
 		&attendance.UpdatedAt,
 	)
@@ -284,14 +284,23 @@ func (r *attendanceRepository) UpdateAttendance(attendance *models.Attendance) e
 		return fmt.Errorf("ошибка проверки обновленного значения: %w", err)
 	}
 
-	// Проверка, что значение действительно обновилось
-	if returnedAttended != attendance.Attended {
-		return fmt.Errorf("значение attended не обновилось: ожидалось %v, получено %v",
-			attendance.Attended, returnedAttended)
+	// Преобразуем sql.NullBool в bool для сравнения
+	returnedAttended := false
+	if returnedAttendedNull.Valid {
+		returnedAttended = returnedAttendedNull.Bool
+	} else {
+		// Если значение NULL, это ошибка - мы только что обновили его
+		return fmt.Errorf("значение attended NULL после обновления для id=%d", attendance.ID)
 	}
 
-	fmt.Printf("[UpdateAttendance] Успешно обновлено: id=%d, attended в БД=%v (ожидалось %v)\n",
-		attendance.ID, returnedAttended, attendance.Attended)
+	// Проверка, что значение действительно обновилось
+	if returnedAttended != attendance.Attended {
+		return fmt.Errorf("значение attended не обновилось: ожидалось %v, получено %v (valid=%v)",
+			attendance.Attended, returnedAttended, returnedAttendedNull.Valid)
+	}
+
+	fmt.Printf("[UpdateAttendance] Успешно обновлено: id=%d, attended в БД=%v (ожидалось %v, valid=%v)\n",
+		attendance.ID, returnedAttended, attendance.Attended, returnedAttendedNull.Valid)
 
 	return nil
 }

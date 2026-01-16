@@ -463,21 +463,70 @@ export class CalendarComponent implements OnInit {
     const studentIds = Array.from(this.selectedStudents);
     this.calendarService.markAttendance(this.selectedTraining.training.id, studentIds).subscribe({
       next: (response: any) => {
-        alert(`✅ Посещаемость подтверждена для ${response.marked_count || studentIds.length} учеников`);
-        this.closeModal();
-        this.reloadCalendar();
+        // Проверяем, есть ли ошибки в ответе
+        if (response.success === false || (response.failed_count && response.failed_count > 0)) {
+          // Частичный успех или полная ошибка
+          let message = '';
+          if (response.message) {
+            message = response.message;
+          } else if (response.failed_count > 0) {
+            message = `Посещаемость подтверждена для ${response.marked_count || 0} из ${response.total_count || studentIds.length} учеников`;
+          } else {
+            message = 'Не удалось подтвердить посещаемость';
+          }
+          
+          // Добавляем детали об ошибках
+          if (response.errors && response.errors.length > 0) {
+            const errorsList = response.errors.join('\n');
+            message += '\n\nОшибки:\n' + errorsList;
+          } else if (response.failed_students && response.failed_students.length > 0) {
+            const failedNames = response.failed_students.map((s: any) => 
+              `${s.student_name || 'Ученик ' + s.student_id}: ${s.error || 'Неизвестная ошибка'}`
+            ).join('\n');
+            message += '\n\nОшибки:\n' + failedNames;
+          }
+          
+          alert('⚠️ ' + message);
+          
+          // Если хотя бы часть учеников отмечена, обновляем календарь
+          if (response.marked_count > 0) {
+            this.closeModal();
+            this.reloadCalendar();
+          }
+        } else {
+          // Полный успех
+          alert(`✅ Посещаемость подтверждена для ${response.marked_count || studentIds.length} учеников`);
+          this.closeModal();
+          this.reloadCalendar();
+        }
       },
       error: (err) => {
         let errorMessage = 'Не удалось подтвердить посещаемость';
+        
+        // Пытаемся извлечь детальную информацию об ошибке
         if (err.error) {
           if (typeof err.error === 'string') {
             errorMessage = err.error;
           } else if (err.error.message) {
             errorMessage = err.error.message;
+          } else if (err.error.error) {
+            errorMessage = err.error.error;
+          }
+          
+          // Если есть информация о неудачных учениках
+          if (err.error.failed_students && err.error.failed_students.length > 0) {
+            const failedNames = err.error.failed_students.map((s: any) => 
+              `${s.student_name || 'Ученик ' + s.student_id}: ${s.error || 'Неизвестная ошибка'}`
+            ).join('\n');
+            errorMessage += '\n\nДетали:\n' + failedNames;
+          } else if (err.error.errors && err.error.errors.length > 0) {
+            errorMessage += '\n\nДетали:\n' + err.error.errors.join('\n');
           }
         } else if (err.message) {
           errorMessage = err.message;
         }
+        
+        console.error('Ошибка при подтверждении посещаемости:', err);
         alert('❌ Ошибка: ' + errorMessage);
       }
     });
