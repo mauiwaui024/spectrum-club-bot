@@ -2,6 +2,7 @@ package attendance_service
 
 import (
 	"errors"
+	"fmt"
 	"spectrum-club-bot/internal/models"
 	"spectrum-club-bot/internal/repository"
 	"spectrum-club-bot/internal/service"
@@ -76,7 +77,7 @@ func (s *attendanceService) CancelSignUp(studentID, trainingID int) error {
 func (s *attendanceService) MarkAttendance(trainingID, studentID, recordedBy int, attended bool, notes string) error {
 	attendance, err := s.attendanceRepo.GetStudentAttendanceForTraining(studentID, trainingID)
 	if err != nil {
-		return err
+		return fmt.Errorf("ошибка получения записи посещаемости: %w", err)
 	}
 	if attendance == nil {
 		return errors.New("студент не записан на эту тренировку")
@@ -94,12 +95,19 @@ func (s *attendanceService) MarkAttendance(trainingID, studentID, recordedBy int
 		}
 	}
 
+	// Обновляем поля посещаемости
 	attendance.Attended = attended
 	attendance.Notes = notes
 	attendance.RecordedBy = &recordedBy
 	attendance.RecordedAt = time.Now()
 
-	return s.attendanceRepo.UpdateAttendance(attendance)
+	// Обновляем запись в БД
+	err = s.attendanceRepo.UpdateAttendance(attendance)
+	if err != nil {
+		return fmt.Errorf("ошибка обновления посещаемости в БД: %w", err)
+	}
+
+	return nil
 }
 
 // Просмотр записавшихся

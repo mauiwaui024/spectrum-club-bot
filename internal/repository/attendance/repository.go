@@ -216,17 +216,24 @@ func (r *attendanceRepository) GetStudentAttendanceForTraining(studentID, traini
 func (r *attendanceRepository) UpdateAttendance(attendance *models.Attendance) error {
 	query := `
 		UPDATE spectrum.attendance 
-		SET attended = $1, notes = $2, recorded_by = $3, recorded_at = CURRENT_TIMESTAMP
-		WHERE id = $4
-		RETURNING recorded_at
+		SET attended = $1, notes = $2, recorded_by = $3, recorded_at = $4, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $5
+		RETURNING recorded_at, updated_at
 	`
-	return r.db.QueryRow(
+	err := r.db.QueryRow(
 		query,
 		attendance.Attended,
 		attendance.Notes,
 		attendance.RecordedBy,
+		attendance.RecordedAt,
 		attendance.ID,
-	).Scan(&attendance.RecordedAt)
+	).Scan(&attendance.RecordedAt, &attendance.UpdatedAt)
+	
+	if err != nil {
+		return fmt.Errorf("ошибка обновления посещаемости: %w", err)
+	}
+	
+	return nil
 }
 
 func (r *attendanceRepository) DeleteAttendance(id int) error {
