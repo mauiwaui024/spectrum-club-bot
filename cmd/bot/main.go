@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"net/http"
 	"os"
@@ -92,6 +93,103 @@ func main() {
 	mux := http.NewServeMux()
 
 	// API endpoints (должны быть перед статикой)
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+	// Debug endpoint для проверки initData (только в development)
+	// Всегда доступен для локальной отладки
+	mux.HandleFunc("/api/debug/initdata", func(w http.ResponseWriter, r *http.Request) {
+		initData := r.Header.Get("X-Telegram-Init-Data")
+
+		// Логирование для отладки
+		log.Printf("[DEBUG /api/debug/initdata] Запрос получен")
+		log.Printf("[DEBUG /api/debug/initdata] initData в заголовке: %v (длина: %d)",
+			initData != "", len(initData))
+		if initData != "" {
+			log.Printf("[DEBUG /api/debug/initdata] initData (первые 100 символов): %s",
+				func() string {
+					if len(initData) > 100 {
+						return initData[:100] + "..."
+					}
+					return initData
+				}())
+
+			// Проверка будет выполнена в verifyTelegramWebAppData (логи там)
+			log.Printf("[DEBUG /api/debug/initdata] initData будет проверен в verifyTelegramWebAppData")
+		} else {
+			log.Printf("[DEBUG /api/debug/initdata] initData пустой - страница открыта не через Telegram")
+		}
+
+		// Получаем все заголовки для отладки
+		allHeaders := make(map[string]string)
+		for k, v := range r.Header {
+			if len(v) > 0 {
+				allHeaders[k] = v[0]
+			}
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Access-Control-Allow-Origin", "*") // Для локальной разработки
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"initData":       initData,
+			"initDataLength": len(initData),
+			"hasInitData":    initData != "",
+			"userAgent":      r.UserAgent(),
+			"environment":    cfg.Environment,
+			"headers":        allHeaders,
+		})
+	})
+
+	// Тестовый endpoint для проверки initData вручную (POST с initData в теле)
+	mux.HandleFunc("/api/test/initdata", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		// Получаем initData из заголовка или тела запроса
+		initData := r.Header.Get("X-Telegram-Init-Data")
+		if initData == "" {
+			if err := r.ParseForm(); err == nil {
+				initData = r.FormValue("initData")
+			}
+		}
+		if initData == "" {
+			// Пробуем получить из JSON body
+			var body map[string]string
+			if err := json.NewDecoder(r.Body).Decode(&body); err == nil {
+				initData = body["initData"]
+			}
+		}
+
+		log.Printf("[TEST /api/test/initdata] Получен initData для тестирования, длина: %d", len(initData))
+
+		if initData == "" {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"error": "initData не предоставлен",
+				"usage": "Отправьте POST запрос с initData в заголовке X-Telegram-Init-Data или в теле запроса (form: initData или json: {\"initData\": \"...\"})",
+			})
+			return
+		}
+
+		log.Printf("[TEST /api/test/initdata] initData (первые 100 символов): %s",
+			func() string {
+				if len(initData) > 100 {
+					return initData[:100] + "..."
+				}
+				return initData
+			}())
+
+		// Используем AuthAPI для проверки initData (он уже делает всю работу)
+		// Создаем временный request с initData в заголовке
+		testReq, _ := http.NewRequest("POST", "/api/auth", nil)
+		testReq.Header.Set("X-Telegram-Init-Data", initData)
+
+		// Вызываем AuthAPI напрямую - он проверит initData и вернет userID
+		calendarHandler.AuthAPI(w, testReq)
+	})
 	mux.HandleFunc("/api/auth", calendarHandler.AuthAPI)
 	mux.HandleFunc("/api/training/", calendarHandler.TrainingDetailsAPI)
 	mux.HandleFunc("/api/calendar", calendarHandler.CalendarAPI)
@@ -159,8 +257,13 @@ func main() {
 	log.Println("🛑 Получен сигнал завершения...")
 
 	// Даем время на завершение операций
-	_, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
+	// Graceful shutdown HTTP сервера
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("⚠️ Ошибка при остановке HTTP сервера: %v", err)
+	}
 
 	// Здесь можно добавить cleanup
 	log.Println("👋 Корректное завершение работы")
