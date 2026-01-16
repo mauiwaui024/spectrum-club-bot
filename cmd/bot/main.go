@@ -64,7 +64,7 @@ func main() {
 	subscriptionService := subscription_service.NewSubscriptionService(subscriptionRepo)
 	trainingGroupService := group_serivce.NewTrainingGroupService(trainingGroupRepo)
 	//new
-	attendanceService := attendance_service.NewAttendanceService(attendanceRepo, scheduleRepo)
+	attendanceService := attendance_service.NewAttendanceService(attendanceRepo, scheduleRepo, subscriptionService)
 	scheduleService := schedule_service.NewScheduleService(scheduleRepo, attendanceRepo, templateScheduleRepos, trainingGroupRepo)
 	// Создаем веб-хендлер с botToken для проверки Telegram WebApp initData
 	calendarHandler := web.NewHandler(
@@ -196,6 +196,7 @@ func main() {
 	mux.HandleFunc("/api/check-registration", calendarHandler.CheckRegistration)
 	mux.HandleFunc("/api/register", calendarHandler.RegisterForTraining)
 	mux.HandleFunc("/api/cancel", calendarHandler.CancelRegistration)
+	mux.HandleFunc("/api/mark-attendance", calendarHandler.MarkAttendanceAPI)
 
 	// Статические файлы Angular (для production)
 	// В development Angular dev server будет на порту 4200
