@@ -65,13 +65,14 @@ func main() {
 	//new
 	attendanceService := attendance_service.NewAttendanceService(attendanceRepo, scheduleRepo)
 	scheduleService := schedule_service.NewScheduleService(scheduleRepo, attendanceRepo, templateScheduleRepos, trainingGroupRepo)
-	// Создаем веб-хендлер
+	// Создаем веб-хендлер с botToken для проверки Telegram WebApp initData
 	calendarHandler := web.NewHandler(
 		scheduleService,
 		coachService,
 		attendanceService,
 		studentService,
 		userService,
+		cfg.Bot.Token,
 	)
 
 	telegramBot, err := bot.NewBot(
@@ -91,6 +92,7 @@ func main() {
 	mux := http.NewServeMux()
 
 	// API endpoints (должны быть перед статикой)
+	mux.HandleFunc("/api/auth", calendarHandler.AuthAPI)
 	mux.HandleFunc("/api/training/", calendarHandler.TrainingDetailsAPI)
 	mux.HandleFunc("/api/calendar", calendarHandler.CalendarAPI)
 	mux.HandleFunc("/api/check-registration", calendarHandler.CheckRegistration)
@@ -101,8 +103,7 @@ func main() {
 	// В development Angular dev server будет на порту 4200
 	angularDir := http.Dir("frontend/dist/spectrum-club-calendar/browser")
 	angularFS := http.FileServer(angularDir)
-	
-	// Раздаем статические файлы Angular
+
 	// Для SPA: все запросы, кроме API, возвращают index.html
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		// Проверяем, существует ли файл
@@ -110,7 +111,7 @@ func main() {
 		if path == "/" {
 			path = "/index.html"
 		}
-		
+
 		file, err := angularDir.Open(path)
 		if err != nil {
 			// Файл не найден - возвращаем index.html для SPA роутинга
@@ -124,7 +125,7 @@ func main() {
 			return
 		}
 		defer file.Close()
-		
+
 		// Файл существует - отдаем его
 		angularFS.ServeHTTP(w, r)
 	})

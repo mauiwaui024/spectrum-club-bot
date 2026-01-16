@@ -10,14 +10,14 @@ func (b *Bot) handleCalendarCommand(message *tgbotapi.Message) {
 	chatID := message.Chat.ID
 	userID := message.From.ID
 
-	user, err := b.UserService.GetByTelegramID(int64(userID))
+	_, err := b.UserService.GetByTelegramID(int64(userID))
 	if err != nil {
 		b.sendMessage(chatID, "Сначала зарегистрируйтесь в боте")
 		return
 	}
 
-	// Формируем URL
-	url := fmt.Sprintf("%s/calendar?user_id=%d", b.webBaseURL, user.ID)
+	// Формируем URL без user_id (будет использоваться initData из Telegram WebApp)
+	url := fmt.Sprintf("%s/calendar", b.webBaseURL)
 
 	/*
 		// Старый код с простой отправкой URL

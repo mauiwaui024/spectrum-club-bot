@@ -1,9 +1,13 @@
 package web
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -19,6 +23,7 @@ type Handler struct {
 	attendanceService service.AttendanceService
 	studentService    service.StudentService
 	userService       service.UserService
+	botToken          string // Для проверки Telegram WebApp initData
 }
 
 func NewHandler(
@@ -27,6 +32,7 @@ func NewHandler(
 	attendanceService service.AttendanceService,
 	studentService service.StudentService,
 	userService service.UserService,
+	botToken string,
 ) *Handler {
 	return &Handler{
 		scheduleService:   scheduleService,
@@ -34,6 +40,7 @@ func NewHandler(
 		attendanceService: attendanceService,
 		studentService:    studentService,
 		userService:       userService,
+		botToken:          botToken,
 	}
 }
 
@@ -42,7 +49,13 @@ func NewHandler(
 
 // CalendarAPI возвращает данные календаря в формате JSON
 func (h *Handler) CalendarAPI(w http.ResponseWriter, r *http.Request) {
-	userIDStr := r.URL.Query().Get("user_id")
+	// Получаем userID из initData или query параметра (fallback)
+	userID, userErr := h.getUserIDFromRequest(r)
+	var userIDStr string
+	if userErr == nil {
+		userIDStr = strconv.FormatInt(userID, 10)
+	}
+
 	view := r.URL.Query().Get("view")
 	dateStr := r.URL.Query().Get("date")
 
@@ -85,20 +98,15 @@ func (h *Handler) CalendarAPI(w http.ResponseWriter, r *http.Request) {
 		endDate = startDate.AddDate(0, 1, 0) // Следующий месяц
 	}
 
-	// Получаем пользователя
+	// Получаем пользователя из initData или query параметра (fallback)
 	var isCoach bool
 	var userName string
-	var userID int64
 
-	if userIDStr != "" {
-		var err error
-		userID, err = strconv.ParseInt(userIDStr, 10, 64)
-		if err == nil {
-			user, err := h.userService.GetByID(userID)
-			if err == nil {
-				isCoach = user.Role == "coach"
-				userName = user.FirstName + " " + user.LastName
-			}
+	if userErr == nil {
+		user, getUserErr := h.userService.GetByID(userID)
+		if getUserErr == nil {
+			isCoach = user.Role == "coach"
+			userName = user.FirstName + " " + user.LastName
 		}
 	}
 
@@ -344,15 +352,13 @@ func (h *Handler) prepareWeekViewJSON(startDate time.Time, trainings []models.Tr
 
 			if trainingDate == dayStr {
 				// Получаем только время (часы и минуты) из time.Time
-				// Приводим к локальному времени для правильного извлечения часов и минут
-				startTime := training.StartTime.In(time.Local)
-				endTime := training.EndTime.In(time.Local)
-
-				// Извлекаем часы и минуты из локального времени
-				startHour := startTime.Hour()
-				startMinute := startTime.Minute()
-				endHour := endTime.Hour()
-				endMinute := endTime.Minute()
+				// PostgreSQL TIME сканируется как time.Time с нулевой датой
+				// Не используем .In(time.Local) так как TIME не содержит информации о часовом поясе
+				// Извлекаем часы и минуты напрямую
+				startHour := training.StartTime.Hour()
+				startMinute := training.StartTime.Minute()
+				endHour := training.EndTime.Hour()
+				endMinute := training.EndTime.Minute()
 
 				// Рассчитываем позицию и высоту
 				startMinutes := startHour*60 + startMinute
@@ -420,15 +426,13 @@ func (h *Handler) prepareDayViewJSON(date time.Time, trainings []models.Training
 
 		if trainingDate == dateStr {
 			// Получаем только время (часы и минуты) из time.Time
-			// Приводим к локальному времени для правильного извлечения часов и минут
-			startTime := training.StartTime.In(time.Local)
-			endTime := training.EndTime.In(time.Local)
-
-			// Извлекаем часы и минуты из локального времени
-			startHour := startTime.Hour()
-			startMinute := startTime.Minute()
-			endHour := endTime.Hour()
-			endMinute := endTime.Minute()
+			// PostgreSQL TIME сканируется как time.Time с нулевой датой
+			// Не используем .In(time.Local) так как TIME не содержит информации о часовом поясе
+			// Извлекаем часы и минуты напрямую
+			startHour := training.StartTime.Hour()
+			startMinute := training.StartTime.Minute()
+			endHour := training.EndTime.Hour()
+			endMinute := training.EndTime.Minute()
 
 			// Рассчитываем позицию и высоту
 			startMinutes := startHour*60 + startMinute
@@ -531,8 +535,21 @@ func (h *Handler) prepareScheduleViewJSON(trainings []models.TrainingSchedule, u
 				att, _ := h.attendanceService.GetStudentAttendanceForTraining(int(student.ID), training.ID)
 				isRegistered = att != nil && att.Status == "registered"
 
+				// Создаем полную дату и время начала тренировки для правильного сравнения
+				trainingDateTime := time.Date(
+					training.TrainingDate.Year(),
+					training.TrainingDate.Month(),
+					training.TrainingDate.Day(),
+					training.StartTime.Hour(),
+					training.StartTime.Minute(),
+					training.StartTime.Second(),
+					0,
+					training.TrainingDate.Location(),
+				)
+				fmt.Println(trainingDateTime)
 				// Проверяем, можно ли записаться
-				if !isRegistered && training.TrainingDate.After(time.Now()) {
+				// Тренировка должна быть в будущем (дата и время начала)
+				if !isRegistered && trainingDateTime.After(time.Now()) {
 					if training.MaxParticipants != nil && *training.MaxParticipants > 0 {
 						maxParticipants := *training.MaxParticipants
 						if len(participants) < maxParticipants {
@@ -860,8 +877,21 @@ func (h *Handler) prepareScheduleView(trainings []models.TrainingSchedule, userI
 				att, _ := h.attendanceService.GetStudentAttendanceForTraining(int(student.ID), training.ID)
 				isRegistered = att != nil && att.Status == "registered"
 
+				// Создаем полную дату и время начала тренировки для правильного сравнения
+				trainingDateTime := time.Date(
+					training.TrainingDate.Year(),
+					training.TrainingDate.Month(),
+					training.TrainingDate.Day(),
+					training.StartTime.Hour(),
+					training.StartTime.Minute(),
+					training.StartTime.Second(),
+					0,
+					training.TrainingDate.Location(),
+				)
+
 				// Проверяем, можно ли записаться
-				if !isRegistered && training.TrainingDate.After(time.Now()) {
+				// Тренировка должна быть в будущем (дата и время начала)
+				if !isRegistered && trainingDateTime.After(time.Now()) {
 					if training.MaxParticipants != nil && *training.MaxParticipants > 0 {
 						maxParticipants := *training.MaxParticipants
 						if len(participants) < maxParticipants {
@@ -964,21 +994,18 @@ func (h *Handler) TrainingDetailsAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Получаем user_id
-	userIDStr := r.URL.Query().Get("user_id")
-	var userID int64
+	// Получаем userID из initData или query параметра (fallback)
+	userID, err := h.getUserIDFromRequest(r)
+	var userIDStr string
 	var isCoach bool
 	var userName string
 
-	if userIDStr != "" {
-		var err error
-		userID, err = strconv.ParseInt(userIDStr, 10, 64)
+	if err == nil {
+		userIDStr = strconv.FormatInt(userID, 10)
+		user, err := h.userService.GetByID(userID)
 		if err == nil {
-			user, err := h.userService.GetByID(userID)
-			if err == nil {
-				isCoach = user.Role == "coach"
-				userName = user.FirstName + " " + user.LastName
-			}
+			isCoach = user.Role == "coach"
+			userName = user.FirstName + " " + user.LastName
 		}
 	}
 	fmt.Println(userName)
@@ -999,29 +1026,68 @@ func (h *Handler) TrainingDetailsAPI(w http.ResponseWriter, r *http.Request) {
 	isRegistered := false
 	canRegister := false
 	isFull := false
-	isPast := time.Now().After(training.TrainingDate)
 
+	// Создаем полную дату и время начала тренировки для правильного сравнения
+	trainingDateTime := time.Date(
+		training.TrainingDate.Year(),
+		training.TrainingDate.Month(),
+		training.TrainingDate.Day(),
+		training.StartTime.Hour(),
+		training.StartTime.Minute(),
+		training.StartTime.Second(),
+		0,
+		training.TrainingDate.Location(),
+	)
+
+	// Отладочный вывод
+	now := time.Now()
+	fmt.Printf("[TrainingDetailsAPI] TrainingID: %d, UserID: %s\n", trainingID, userIDStr)
+	fmt.Printf("[TrainingDetailsAPI] TrainingDate: %s\n", training.TrainingDate.Format("2006-01-02 15:04:05"))
+	fmt.Printf("[TrainingDetailsAPI] StartTime: %s\n", training.StartTime.Format("15:04:05"))
+	fmt.Printf("[TrainingDetailsAPI] TrainingDateTime (combined): %s\n", trainingDateTime.Format("2006-01-02 15:04:05"))
+	fmt.Printf("[TrainingDetailsAPI] Now: %s\n", now.Format("2006-01-02 15:04:05"))
+	fmt.Printf("[TrainingDetailsAPI] TrainingDateTime.After(Now): %v\n", trainingDateTime.After(now))
+	fmt.Printf("[TrainingDetailsAPI] MaxParticipants: %v, Current participants: %d\n", training.MaxParticipants, len(participants))
+
+	isPast := now.After(trainingDateTime)
+
+	// Проверяем регистрацию пользователя, если userID передан
 	if userIDStr != "" && !isCoach {
 		student, err := h.studentService.GetStudentByUserID(userID)
 		if err == nil {
 			att, _ := h.attendanceService.GetStudentAttendanceForTraining(int(student.ID), trainingID)
 			isRegistered = att != nil && att.Status == "registered"
-
-			// Проверяем, можно ли записаться
-			if !isRegistered && training.TrainingDate.After(time.Now()) {
-				if training.MaxParticipants != nil && *training.MaxParticipants > 0 {
-					maxParticipants := *training.MaxParticipants
-					if len(participants) < maxParticipants {
-						canRegister = true
-					} else {
-						isFull = true
-					}
-				} else {
-					canRegister = true
-				}
-			}
+			fmt.Printf("[TrainingDetailsAPI] Student found, ID: %d\n", student.ID)
+			fmt.Printf("[TrainingDetailsAPI] IsRegistered: %v\n", isRegistered)
+		} else {
+			fmt.Printf("[TrainingDetailsAPI] Student not found: %v\n", err)
 		}
+	} else {
+		fmt.Printf("[TrainingDetailsAPI] No userID or isCoach: userIDStr=%s, isCoach=%v\n", userIDStr, isCoach)
 	}
+
+	// Проверяем, можно ли записаться (независимо от того, передан userID или нет)
+	// userID нужен только для самой записи, но для определения can_register достаточно проверить:
+	// 1. Тренировка в будущем (дата и время начала)
+	// 2. Есть свободные места (если установлен лимит)
+	// 3. Пользователь не записан (если userID передан, иначе считаем что не записан)
+	if !isRegistered && trainingDateTime.After(now) {
+		if training.MaxParticipants != nil && *training.MaxParticipants > 0 {
+			maxParticipants := *training.MaxParticipants
+			if len(participants) < maxParticipants {
+				canRegister = true
+			} else {
+				isFull = true
+			}
+		} else {
+			// Если лимита нет, всегда можно записаться (если тренировка в будущем)
+			canRegister = true
+		}
+	} else {
+		fmt.Printf("[TrainingDetailsAPI] Cannot register: isRegistered=%v, trainingDateTime.After(now)=%v\n", isRegistered, trainingDateTime.After(now))
+	}
+
+	fmt.Printf("[TrainingDetailsAPI] Final values: isRegistered=%v, canRegister=%v, isFull=%v, isPast=%v\n", isRegistered, canRegister, isFull, isPast)
 
 	// Формируем ответ
 	response := map[string]interface{}{
@@ -1056,12 +1122,19 @@ func (h *Handler) RegisterForTraining(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Парсим multipart/form-data (для FormData из Angular)
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		// Если не multipart, пробуем обычную форму
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "Failed to parse form: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+
 	// Получаем параметры из формы
 	trainingIDStr := r.FormValue("training_id")
-	userIDStr := r.FormValue("user_id")
-
-	if trainingIDStr == "" || userIDStr == "" {
-		http.Error(w, "Missing parameters", http.StatusBadRequest)
+	if trainingIDStr == "" {
+		http.Error(w, "Missing training_id", http.StatusBadRequest)
 		return
 	}
 
@@ -1071,10 +1144,20 @@ func (h *Handler) RegisterForTraining(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, err := strconv.ParseInt(userIDStr, 10, 64)
-	if err != nil {
-		http.Error(w, "Invalid user ID", http.StatusBadRequest)
-		return
+	// Получаем userID из initData (безопасный способ) или из формы (fallback)
+	userID, authErr := h.getUserIDFromRequest(r)
+	if authErr != nil {
+		// Fallback: из формы (для обратной совместимости)
+		userIDStr := r.FormValue("user_id")
+		if userIDStr == "" {
+			http.Error(w, "Authentication required", http.StatusUnauthorized)
+			return
+		}
+		userID, err = strconv.ParseInt(userIDStr, 10, 64)
+		if err != nil {
+			http.Error(w, "Invalid user ID", http.StatusBadRequest)
+			return
+		}
 	}
 
 	// Получаем студента по userID
@@ -1133,12 +1216,19 @@ func (h *Handler) CancelRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Парсим multipart/form-data (для FormData из Angular)
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		// Если не multipart, пробуем обычную форму
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "Failed to parse form: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+
 	// Получаем параметры из формы
 	trainingIDStr := r.FormValue("training_id")
-	userIDStr := r.FormValue("user_id")
-
-	if trainingIDStr == "" || userIDStr == "" {
-		http.Error(w, "Missing parameters", http.StatusBadRequest)
+	if trainingIDStr == "" {
+		http.Error(w, "Missing training_id", http.StatusBadRequest)
 		return
 	}
 
@@ -1148,10 +1238,20 @@ func (h *Handler) CancelRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, err := strconv.ParseInt(userIDStr, 10, 64)
-	if err != nil {
-		http.Error(w, "Invalid user ID", http.StatusBadRequest)
-		return
+	// Получаем userID из initData (безопасный способ) или из формы (fallback)
+	userID, authErr := h.getUserIDFromRequest(r)
+	if authErr != nil {
+		// Fallback: из формы (для обратной совместимости)
+		userIDStr := r.FormValue("user_id")
+		if userIDStr == "" {
+			http.Error(w, "Authentication required", http.StatusUnauthorized)
+			return
+		}
+		userID, err = strconv.ParseInt(userIDStr, 10, 64)
+		if err != nil {
+			http.Error(w, "Invalid user ID", http.StatusBadRequest)
+			return
+		}
 	}
 
 	// Получаем студента по userID
@@ -1192,15 +1292,24 @@ func (h *Handler) CancelRegistration(w http.ResponseWriter, r *http.Request) {
 // CheckRegistration проверяет статус записи студента на тренировку
 func (h *Handler) CheckRegistration(w http.ResponseWriter, r *http.Request) {
 	trainingIDStr := r.URL.Query().Get("training_id")
-	userIDStr := r.URL.Query().Get("user_id")
-
-	if trainingIDStr == "" || userIDStr == "" {
-		http.Error(w, "Missing parameters", http.StatusBadRequest)
+	if trainingIDStr == "" {
+		http.Error(w, "Missing training_id", http.StatusBadRequest)
 		return
 	}
 
 	trainingID, _ := strconv.Atoi(trainingIDStr)
-	userID, _ := strconv.ParseInt(userIDStr, 10, 64)
+
+	// Получаем userID из initData (безопасный способ) или из query параметра (fallback)
+	userID, err := h.getUserIDFromRequest(r)
+	if err != nil {
+		// Fallback: из query параметра (для обратной совместимости)
+		userIDStr := r.URL.Query().Get("user_id")
+		if userIDStr == "" {
+			http.Error(w, "Authentication required", http.StatusUnauthorized)
+			return
+		}
+		userID, _ = strconv.ParseInt(userIDStr, 10, 64)
+	}
 
 	student, err := h.studentService.GetStudentByUserID(userID)
 	if err != nil {
@@ -1219,4 +1328,148 @@ func (h *Handler) CheckRegistration(w http.ResponseWriter, r *http.Request) {
 		"registered": attendance != nil && attendance.Status == "registered",
 		"attendance": attendance,
 	})
+}
+
+// verifyTelegramWebAppData проверяет подлинность Telegram WebApp initData
+// Возвращает telegram_id если данные валидны, иначе ошибку
+func (h *Handler) verifyTelegramWebAppData(initData string) (int64, error) {
+	if h.botToken == "" {
+		return 0, fmt.Errorf("bot token not configured")
+	}
+
+	// Парсим initData
+	parsed, err := url.ParseQuery(initData)
+	if err != nil {
+		return 0, fmt.Errorf("invalid initData format: %v", err)
+	}
+
+	// Извлекаем hash и остальные параметры
+	hash := parsed.Get("hash")
+	if hash == "" {
+		return 0, fmt.Errorf("hash not found in initData")
+	}
+
+	// Удаляем hash из параметров для проверки
+	parsed.Del("hash")
+
+	// Сортируем параметры по ключу
+	keys := make([]string, 0, len(parsed))
+	for k := range parsed {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	// Формируем data-check-string
+	var dataCheckString strings.Builder
+	for i, k := range keys {
+		if i > 0 {
+			dataCheckString.WriteString("\n")
+		}
+		dataCheckString.WriteString(k)
+		dataCheckString.WriteString("=")
+		values := parsed[k]
+		if len(values) > 0 {
+			dataCheckString.WriteString(values[0])
+		}
+	}
+
+	// Вычисляем секретный ключ
+	secretKey := hmac.New(sha256.New, []byte("WebAppData"))
+	secretKey.Write([]byte(h.botToken))
+	secretKeyBytes := secretKey.Sum(nil)
+
+	// Вычисляем HMAC
+	mac := hmac.New(sha256.New, secretKeyBytes)
+	mac.Write([]byte(dataCheckString.String()))
+	expectedHash := hex.EncodeToString(mac.Sum(nil))
+
+	// Сравниваем хеши
+	if hash != expectedHash {
+		return 0, fmt.Errorf("invalid hash: data not from Telegram")
+	}
+
+	// Извлекаем user из user параметра
+	userStr := parsed.Get("user")
+	if userStr == "" {
+		return 0, fmt.Errorf("user not found in initData")
+	}
+
+	// Парсим JSON user
+	var userData struct {
+		ID int64 `json:"id"`
+	}
+	if err := json.Unmarshal([]byte(userStr), &userData); err != nil {
+		return 0, fmt.Errorf("invalid user data: %v", err)
+	}
+
+	return userData.ID, nil
+}
+
+// AuthAPI проверяет Telegram WebApp initData и возвращает userID из базы
+func (h *Handler) AuthAPI(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Получаем initData из заголовка или тела запроса
+	initData := r.Header.Get("X-Telegram-Init-Data")
+	if initData == "" {
+		// Пробуем получить из тела запроса
+		if err := r.ParseForm(); err == nil {
+			initData = r.FormValue("initData")
+		}
+	}
+
+	if initData == "" {
+		http.Error(w, "Missing initData", http.StatusBadRequest)
+		return
+	}
+
+	// Проверяем initData и получаем telegram_id
+	telegramID, err := h.verifyTelegramWebAppData(initData)
+	if err != nil {
+		http.Error(w, "Invalid initData: "+err.Error(), http.StatusUnauthorized)
+		return
+	}
+
+	// Находим user в базе по telegram_id
+	user, err := h.userService.GetByTelegramID(telegramID)
+	if err != nil {
+		http.Error(w, "User not found: "+err.Error(), http.StatusNotFound)
+		return
+	}
+
+	// Возвращаем userID
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"user_id":     user.ID,
+		"telegram_id": telegramID,
+	})
+}
+
+// getUserIDFromRequest извлекает userID из запроса через initData или query параметр (fallback)
+func (h *Handler) getUserIDFromRequest(r *http.Request) (int64, error) {
+	// Пробуем получить из initData (безопасный способ)
+	initData := r.Header.Get("X-Telegram-Init-Data")
+	if initData != "" {
+		telegramID, err := h.verifyTelegramWebAppData(initData)
+		if err == nil {
+			user, err := h.userService.GetByTelegramID(telegramID)
+			if err == nil {
+				return user.ID, nil
+			}
+		}
+	}
+
+	// Fallback: из query параметра (для обратной совместимости, но небезопасно)
+	userIDStr := r.URL.Query().Get("user_id")
+	if userIDStr != "" {
+		userID, err := strconv.ParseInt(userIDStr, 10, 64)
+		if err == nil {
+			return userID, nil
+		}
+	}
+
+	return 0, fmt.Errorf("user not authenticated")
 }

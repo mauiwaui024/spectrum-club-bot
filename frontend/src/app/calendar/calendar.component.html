@@ -5,30 +5,40 @@
       <a [routerLink]="['/calendar']" [queryParams]="{user_id: route.snapshot.queryParams['user_id']}" class="logo">
         Spectrum<span>Club</span>
       </a>
-      <div class="current-date">{{ getMonthYear() }}</div>
     </div>
     <div class="header-right">
       <div class="view-selector">
         <button 
-          class="view-btn active" 
-          (click)="changeView('month')">
-          Месяц
-        </button>
+          class="view-btn" 
+          [class.active]="view === CalendarView.Month"
+          (click)="changeView(CalendarView.Month)">Месяц</button>
+        <button 
+          class="view-btn" 
+          [class.active]="view === CalendarView.Week"
+          (click)="changeView(CalendarView.Week)">Неделя</button>
+        <button 
+          class="view-btn" 
+          [class.active]="view === CalendarView.Day"
+          (click)="changeView(CalendarView.Day)">День</button>
       </div>
-      <button 
-        *ngIf="calendarData?.user_id" 
-        class="g-btn"
-        (click)="changeView('schedule')">
-        Расписание
-      </button>
     </div>
   </div>
 
   <!-- Navigation -->
   <div class="calendar-nav">
-    <button class="g-btn" (click)="navigateDate('prev')">‹</button>
-    <span class="nav-date">{{ getDateRange() }}</span>
-    <button class="g-btn" (click)="navigateDate('next')">›</button>
+    <button 
+      class="g-btn" 
+      mwlCalendarPreviousView
+      [view]="view"
+      [(viewDate)]="viewDate"
+      (viewDateChange)="onViewDateChange($event)">‹</button>
+    <span class="nav-date">{{ calendarData ? getDateRange() : 'Загрузка...' }}</span>
+    <button 
+      class="g-btn"
+      mwlCalendarNextView
+      [view]="view"
+      [(viewDate)]="viewDate"
+      (viewDateChange)="onViewDateChange($event)">›</button>
   </div>
 
   <!-- Loading -->
@@ -37,89 +47,26 @@
   <!-- Error -->
   <div *ngIf="error" class="error">{{ error }}</div>
 
-  <!-- Main Calendar Content -->
-  <div *ngIf="calendarData && !loading">
-    <!-- Month View -->
-    <div *ngIf="currentView === 'month' && calendarData.calendar_days" class="calendar-grid">
-      <!-- Day headers -->
-      <div *ngFor="let day of calendarData.week_days" class="day-header">
-        <div class="day-name">{{ day.name }}</div>
-        <div class="date-num">{{ day.day }}</div>
-      </div>
-
-      <!-- Calendar cells -->
-      <div 
-        *ngFor="let day of calendarData.calendar_days"
-        class="calendar-cell"
-        [class.today]="day.is_today"
-        [class.other-month]="day.is_other_month"
-        [attr.data-date]="day.date">
-        <div class="day-number" [class.today-indicator]="day.is_today">{{ getDayFromDate(day.date) }}</div>
-        
-        <div class="events-container">
-          <div 
-            *ngFor="let event of day.events; trackBy: trackByEventId; let i = index"
-            class="calendar-event month-event"
-            [ngClass]="getEventColorClass(event.color_index)"
-            (click)="showEventDetails(event.id)"
-            [title]="event.title + ' - ' + event.time">
-            <div class="event-title">{{ event.title }}</div>
-            <div class="event-time">{{ event.time }}</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Schedule View (list) -->
-    <div *ngIf="currentView === 'schedule' && calendarData.training_days" style="margin: 24px;">
-      <div *ngFor="let scheduleDay of calendarData.training_days" class="schedule-day">
-        <h3 class="day-title">{{ scheduleDay.date }}</h3>
-        
-        <div 
-          *ngFor="let training of scheduleDay.trainings"
-          class="schedule-event"
-          [ngClass]="getEventColorClass(training.color_index)"
-          (click)="showEventDetails(training.id)">
-          <div style="display: flex; align-items: center; gap: 12px;">
-            <div class="event-time-display">
-              {{ training.start_time }} – {{ training.end_time }}
-            </div>
-            <div class="event-details">
-              <div class="event-main-title">{{ training.group_name }}</div>
-              <div class="event-meta">
-                <span *ngIf="training.coach_name">👨‍🏫 {{ training.coach_name }}</span>
-                <span *ngIf="training.participants > 0"> • 👥 {{ training.participants }} записались</span>
-              </div>
-            </div>
-            <div *ngIf="!calendarData.is_coach">
-              <button 
-                *ngIf="training.can_register"
-                class="g-btn g-btn-primary" 
-                style="padding: 6px 12px;"
-                (click)="showEventDetails(training.id); $event.stopPropagation()">
-                Записаться
-              </button>
-              <div *ngIf="training.is_registered" style="display: flex; gap: 8px; align-items: center;">
-                <span style="color: #137333; font-size: 13px; padding: 6px 12px; background: #e6f4ea; border-radius: 4px;">
-                  ✅ Вы записаны
-                </span>
-                <button 
-                  class="g-btn g-btn-danger-outline" 
-                  style="padding: 6px 12px;"
-                  (click)="showEventDetails(training.id); $event.stopPropagation()">
-                  Отменить
-                </button>
-              </div>
-              <span 
-                *ngIf="training.is_full && !training.is_registered"
-                style="color: #d93025; font-size: 13px; padding: 6px 12px; background: #fce8e6; border-radius: 4px;">
-                ⚠️ Мест нет
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+  <!-- Calendar -->
+  <div *ngIf="!loading && !error" style="padding: 20px;">
+    <mwl-calendar-month-view
+      *ngIf="view === CalendarView.Month"
+      [viewDate]="viewDate"
+      [events]="events"
+      (eventClicked)="onEventClicked($event.event)">
+    </mwl-calendar-month-view>
+    <mwl-calendar-week-view
+      *ngIf="view === CalendarView.Week"
+      [viewDate]="viewDate"
+      [events]="events"
+      (eventClicked)="onEventClicked($event.event)">
+    </mwl-calendar-week-view>
+    <mwl-calendar-day-view
+      *ngIf="view === CalendarView.Day"
+      [viewDate]="viewDate"
+      [events]="events"
+      (eventClicked)="onEventClicked($event.event)">
+    </mwl-calendar-day-view>
   </div>
 
   <!-- Modal for Training Details -->

@@ -1,12 +1,17 @@
 import { Routes } from '@angular/router';
+import { CalendarComponent } from './calendar/calendar.component';
+
+console.log('app.routes.ts: CalendarComponent imported:', CalendarComponent);
 
 export const routes: Routes = [
   {
     path: '',
-    loadComponent: () => import('./calendar/calendar.component').then(m => m.CalendarComponent)
+    component: CalendarComponent
   },
   {
     path: 'calendar',
-    loadComponent: () => import('./calendar/calendar.component').then(m => m.CalendarComponent)
+    component: CalendarComponent
   }
 ];
+
+console.log('app.routes.ts: Routes configured:', routes);

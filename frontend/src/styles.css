@@ -1,3 +1,6 @@
+/* Angular Calendar styles - must be first */
+@import "../node_modules/angular-calendar/css/angular-calendar.css";
+
 /* Global styles */
 * {
   margin: 0;
@@ -11,4 +14,77 @@ body {
   color: #202124;
   font-size: 14px;
   line-height: 1.4286;
+}
+
+/* Custom calendar event colors - возврат к исходному круглому виду */
+.cal-month-view .cal-event {
+  width: 10px !important;
+  height: 10px !important;
+  border-radius: 50% !important;
+  display: inline-block !important;
+  margin: 2px !important;
+  transition: all 0.2s ease !important;
+}
+
+.cal-month-view .cal-event:hover {
+  opacity: 0.8;
+  transform: scale(1.2);
+}
+
+/* Переопределение цветов для более мягкой палитры */
+.cal-month-view .cal-day-cell.cal-today {
+  background-color: #f0f9ff !important;
+}
+
+.cal-month-view .cal-day-cell {
+  border-color: #e5e7eb !important;
+}
+
+.cal-month-view .cal-day-number {
+  color: #374151 !important;
+}
+
+.cal-month-view .cal-day-cell.cal-today .cal-day-number {
+  color: #6366f1 !important;
+  font-weight: 600 !important;
+}
+
+.cal-month-view .cal-day-cell.cal-weekend {
+  background-color: #fafafa !important;
+}
+
+.cal-month-view .cal-day-cell.cal-out-month {
+  background-color: #f9fafb !important;
+  opacity: 0.5;
+}
+
+.cal-month-view .cal-day-cell.cal-out-month .cal-day-number {
+  color: #9ca3af !important;
+}
+
+/* Скрываем badge с количеством событий - лишнее, так как есть круглые точки */
+.cal-month-view .cal-day-badge {
+  display: none !important;
+}
+
+/* На мобильных экранах показываем только первые буквы названий дней недели */
+@media (max-width: 767px) {
+  .cal-month-view .cal-header {
+    display: flex !important;
+    justify-content: space-between !important;
+  }
+  
+  .cal-month-view .cal-header .cal-cell {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+    max-width: 1ch !important;
+    width: 1ch !important;
+    overflow: hidden !important;
+    text-overflow: clip !important;
+    padding: 5px 1px !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+    display: block !important;
+    box-sizing: border-box !important;
+  }
 }
