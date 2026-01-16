@@ -148,17 +148,37 @@ func (r *subscriptionRepository) GetHistoryByStudentID(studentID int64) ([]*mode
 }
 
 func (r *subscriptionRepository) Update(subscription *models.Subscription) error {
-	// query := `
-	// 	UPDATE spectrum.subscriptions
-	// 	SET used_lessons = $1, is_active = $2, end_date = $3
-	// 	WHERE id = $4
-	// `
-	// _, err := r.db.Exec(
-	// 	query,
-	// 	subscription.UsedLessons,
-	// 	subscription.IsActive,
-	// 	subscription.EndDate,
-	// 	subscription.ID,
-	// )
-	return nil
+	query := `
+		UPDATE spectrum.subscriptions
+		SET remaining_lessons = $1, end_date = $2
+		WHERE id = $3
+	`
+	_, err := r.db.Exec(
+		query,
+		subscription.RemainingLessons,
+		subscription.EndDate,
+		subscription.ID,
+	)
+	return err
+}
+
+// DecrementRemainingLessons уменьшает remaining_lessons на 1 для активного абонемента ученика
+func (r *subscriptionRepository) DecrementRemainingLessons(studentID int64) error {
+	// Сначала находим активный абонемент
+	subscription, err := r.GetActiveByStudentID(studentID)
+	if err != nil {
+		return fmt.Errorf("нет активного абонемента для ученика с ID %d: %v", studentID, err)
+	}
+	
+	if subscription == nil {
+		return fmt.Errorf("нет активного абонемента для ученика с ID %d", studentID)
+	}
+	
+	// Обновляем remaining_lessons
+	subscription.RemainingLessons--
+	if subscription.RemainingLessons < 0 {
+		subscription.RemainingLessons = 0
+	}
+	
+	return r.Update(subscription)
 }

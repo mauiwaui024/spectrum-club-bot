@@ -9,14 +9,16 @@ import (
 )
 
 type attendanceService struct {
-	attendanceRepo repository.AttendanceRepository
-	scheduleRepo   repository.TrainingScheduleRepository
+	attendanceRepo      repository.AttendanceRepository
+	scheduleRepo        repository.TrainingScheduleRepository
+	subscriptionService service.SubscriptionService
 }
 
-func NewAttendanceService(attendanceRepo repository.AttendanceRepository, scheduleRepo repository.TrainingScheduleRepository) service.AttendanceService {
+func NewAttendanceService(attendanceRepo repository.AttendanceRepository, scheduleRepo repository.TrainingScheduleRepository, subscriptionService service.SubscriptionService) service.AttendanceService {
 	return &attendanceService{
-		attendanceRepo: attendanceRepo,
-		scheduleRepo:   scheduleRepo,
+		attendanceRepo:      attendanceRepo,
+		scheduleRepo:        scheduleRepo,
+		subscriptionService: subscriptionService,
 	}
 }
 
@@ -78,6 +80,18 @@ func (s *attendanceService) MarkAttendance(trainingID, studentID, recordedBy int
 	}
 	if attendance == nil {
 		return errors.New("студент не записан на эту тренировку")
+	}
+
+	// Если ученик посетил тренировку (attended = true) и занятие еще не было вычтено,
+	// вычитаем одно занятие из абонемента
+	if attended && !attendance.Attended {
+		// Получаем studentID как int64 для вызова subscriptionService
+		err := s.subscriptionService.DecrementRemainingLessons(int64(studentID))
+		if err != nil {
+			// Логируем ошибку, но не прерываем процесс отметки посещаемости
+			// Возможно, у ученика нет активного абонемента
+			// Это не критично для отметки посещаемости
+		}
 	}
 
 	attendance.Attended = attended

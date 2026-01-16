@@ -998,6 +998,8 @@ func (h *Handler) TrainingDetailsAPI(w http.ResponseWriter, r *http.Request) {
 	userID, err := h.getUserIDFromRequest(r)
 	var userIDStr string
 	var isCoach bool
+	var isTrainingCoach bool
+	var canMarkAttendance bool
 
 	if err == nil {
 		userIDStr = strconv.FormatInt(userID, 10)
@@ -1038,6 +1040,18 @@ func (h *Handler) TrainingDetailsAPI(w http.ResponseWriter, r *http.Request) {
 
 	now := time.Now()
 	isPast := now.After(trainingDateTime)
+
+	// Проверяем, является ли тренер тренером этой тренировки
+	if isCoach && userIDStr != "" {
+		coach, err := h.coachService.GetCoachByUserID(userID)
+		if err == nil && training.CoachID != nil {
+			isTrainingCoach = *training.CoachID == coach.ID
+		}
+	}
+
+	// Проверяем, может ли тренер отмечать посещаемость
+	// Условия: тренер, тренировка прошла, тренер является тренером этой тренировки
+	canMarkAttendance = isCoach && isPast && isTrainingCoach
 
 	// Проверяем регистрацию пользователя, если userID передан
 	if userIDStr != "" && !isCoach {
@@ -1080,14 +1094,16 @@ func (h *Handler) TrainingDetailsAPI(w http.ResponseWriter, r *http.Request) {
 			"description":      training.Description,
 			"max_participants": training.MaxParticipants,
 		},
-		"participants":       participants,
-		"participants_count": len(participants),
-		"is_coach":           isCoach,
-		"is_registered":      isRegistered,
-		"can_register":       canRegister,
-		"is_full":            isFull,
-		"is_past":            isPast,
-		"current_time":       time.Now().Format(time.RFC3339),
+		"participants":        participants,
+		"participants_count":  len(participants),
+		"is_coach":            isCoach,
+		"is_training_coach":   isTrainingCoach,
+		"can_mark_attendance": canMarkAttendance,
+		"is_registered":       isRegistered,
+		"can_register":        canRegister,
+		"is_full":             isFull,
+		"is_past":             isPast,
+		"current_time":        time.Now().Format(time.RFC3339),
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -1311,6 +1327,133 @@ func (h *Handler) CancelRegistration(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Successfully cancelled registration"))
+}
+
+// MarkAttendanceAPI обрабатывает подтверждение посещаемости тренировки тренером
+func (h *Handler) MarkAttendanceAPI(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Парсим JSON body
+	var requestData struct {
+		TrainingID int   `json:"training_id"`
+		StudentIDs []int `json:"student_ids"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
+		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if requestData.TrainingID == 0 {
+		http.Error(w, "Missing training_id", http.StatusBadRequest)
+		return
+	}
+
+	// Получаем userID из initData (безопасный способ) или из query параметра (fallback)
+	userID, authErr := h.getUserIDFromRequest(r)
+	if authErr != nil {
+		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		return
+	}
+
+	// Проверяем, что пользователь - тренер
+	user, err := h.userService.GetByID(userID)
+	if err != nil {
+		http.Error(w, "User not found: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if user.Role != "coach" {
+		http.Error(w, "Only coaches can mark attendance", http.StatusForbidden)
+		return
+	}
+
+	// Получаем тренера по userID
+	coach, err := h.coachService.GetCoachByUserID(userID)
+	if err != nil {
+		http.Error(w, "Coach not found: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Получаем тренировку
+	training, err := h.scheduleService.GetTrainingByID(requestData.TrainingID)
+	if err != nil {
+		http.Error(w, "Training not found: "+err.Error(), http.StatusNotFound)
+		return
+	}
+
+	// Проверяем, что тренер является тренером этой тренировки
+	if training.CoachID == nil || *training.CoachID != coach.ID {
+		http.Error(w, "Only the training coach can mark attendance", http.StatusForbidden)
+		return
+	}
+
+	// Проверяем, что тренировка прошла
+	trainingDateTime := time.Date(
+		training.TrainingDate.Year(),
+		training.TrainingDate.Month(),
+		training.TrainingDate.Day(),
+		training.StartTime.Hour(),
+		training.StartTime.Minute(),
+		training.StartTime.Second(),
+		0,
+		training.TrainingDate.Location(),
+	)
+
+	if trainingDateTime.After(time.Now()) {
+		http.Error(w, "Cannot mark attendance for future training", http.StatusBadRequest)
+		return
+	}
+
+	// Получаем всех записавшихся учеников
+	participants, err := h.attendanceService.GetParticipants(requestData.TrainingID)
+	if err != nil {
+		http.Error(w, "Failed to get participants: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Создаем множество ID учеников, которые посетили
+	attendedSet := make(map[int]bool)
+	for _, studentID := range requestData.StudentIDs {
+		attendedSet[studentID] = true
+	}
+
+	// Отмечаем посещаемость для всех записавшихся
+	markedCount := 0
+	for _, participant := range participants {
+		// participant.StudentID это int из структуры Attendance
+		studentID := participant.StudentID
+		attended := attendedSet[studentID]
+		err := h.attendanceService.MarkAttendance(
+			requestData.TrainingID,
+			studentID,
+			int(coach.ID),
+			attended,
+			"",
+		)
+		if err != nil {
+			log.Printf("[MarkAttendanceAPI] Ошибка отметки посещаемости для ученика %d: %v", studentID, err)
+			// Продолжаем обработку остальных учеников
+			continue
+		}
+		if attended {
+			markedCount++
+		}
+	}
+
+	// Формируем ответ
+	response := map[string]interface{}{
+		"success":      true,
+		"message":      "Посещаемость подтверждена",
+		"marked_count": markedCount,
+		"total_count":  len(participants),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }
 
 // CheckRegistration проверяет статус записи студента на тренировку

@@ -33,6 +33,10 @@ export class CalendarComponent implements OnInit {
   showModal: boolean = false;
   selectedTraining: TrainingDetails | null = null;
   loadingTraining: boolean = false;
+  
+  // Attendance marking state (для тренеров)
+  selectedStudents: Set<number> = new Set();
+  isSelectingAttendance: boolean = false;
 
   readonly CalendarView = CalendarView;
 
@@ -410,6 +414,73 @@ export class CalendarComponent implements OnInit {
   closeModal() {
     this.showModal = false;
     this.selectedTraining = null;
+    this.isSelectingAttendance = false;
+    this.selectedStudents.clear();
+  }
+  
+  // Переключение режима выбора посещаемости
+  toggleAttendanceSelection() {
+    this.isSelectingAttendance = !this.isSelectingAttendance;
+    if (this.isSelectingAttendance && this.selectedTraining) {
+      // При включении режима выбираем всех участников
+      this.selectedStudents.clear();
+      this.selectedTraining.participants.forEach(participant => {
+        this.selectedStudents.add(participant.student_id);
+      });
+    } else {
+      // При выключении очищаем выбор
+      this.selectedStudents.clear();
+    }
+  }
+  
+  // Переключение выбора конкретного ученика
+  toggleStudentSelection(studentId: number) {
+    if (this.selectedStudents.has(studentId)) {
+      this.selectedStudents.delete(studentId);
+    } else {
+      this.selectedStudents.add(studentId);
+    }
+  }
+  
+  // Проверка, выбран ли ученик
+  isStudentSelected(studentId: number): boolean {
+    return this.selectedStudents.has(studentId);
+  }
+  
+  // Подтверждение посещаемости
+  confirmAttendance() {
+    if (!this.selectedTraining) return;
+    
+    if (this.selectedStudents.size === 0) {
+      alert('Выберите хотя бы одного ученика');
+      return;
+    }
+    
+    if (!confirm(`Подтвердить посещаемость для ${this.selectedStudents.size} учеников?`)) {
+      return;
+    }
+    
+    const studentIds = Array.from(this.selectedStudents);
+    this.calendarService.markAttendance(this.selectedTraining.training.id, studentIds).subscribe({
+      next: (response: any) => {
+        alert(`✅ Посещаемость подтверждена для ${response.marked_count || studentIds.length} учеников`);
+        this.closeModal();
+        this.reloadCalendar();
+      },
+      error: (err) => {
+        let errorMessage = 'Не удалось подтвердить посещаемость';
+        if (err.error) {
+          if (typeof err.error === 'string') {
+            errorMessage = err.error;
+          } else if (err.error.message) {
+            errorMessage = err.error.message;
+          }
+        } else if (err.message) {
+          errorMessage = err.message;
+        }
+        alert('❌ Ошибка: ' + errorMessage);
+      }
+    });
   }
 
   registerForTraining() {

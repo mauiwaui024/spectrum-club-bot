@@ -128,3 +128,8 @@ func (s *subscriptionService) Create1For30Days(studentID int64) error {
 	}
 	return s.subscriptionRepo.Create(subscription)
 }
+
+// DecrementRemainingLessons уменьшает remaining_lessons на 1 для активного абонемента ученика
+func (s *subscriptionService) DecrementRemainingLessons(studentID int64) error {
+	return s.subscriptionRepo.DecrementRemainingLessons(studentID)
+}

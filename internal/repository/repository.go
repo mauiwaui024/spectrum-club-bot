@@ -38,6 +38,7 @@ type SubscriptionRepository interface {
 	GetActiveByStudentID(studentID int64) (*models.Subscription, error)
 	GetHistoryByStudentID(studentID int64) ([]*models.Subscription, error)
 	Update(subscription *models.Subscription) error
+	DecrementRemainingLessons(studentID int64) error
 
 	///
 	GetAll() ([]*models.Subscription, error)

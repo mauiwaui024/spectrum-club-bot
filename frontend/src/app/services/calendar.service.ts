@@ -169,4 +169,15 @@ export class CalendarService {
       headers: this.getHeaders()
     });
   }
+
+  // Подтвердить посещаемость тренировки (для тренеров)
+  markAttendance(trainingId: number, studentIds: number[]): Observable<any> {
+    const body = {
+      training_id: trainingId,
+      student_ids: studentIds
+    };
+    return this.http.post(`${this.apiUrl}/mark-attendance`, body, {
+      headers: this.getHeaders()
+    });
+  }
 }

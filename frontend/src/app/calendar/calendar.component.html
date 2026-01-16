@@ -2,7 +2,7 @@
   <!-- Header -->
   <div class="calendar-header">
     <div class="header-left">
-      <a [routerLink]="['/calendar']" [queryParams]="{user_id: route.snapshot.queryParams['user_id']}" class="logo">
+      <a [routerLink]="['/calendar']" class="logo">
         Spectrum<span>Club</span>
       </a>
     </div>
@@ -110,13 +110,37 @@
           
           <div *ngIf="selectedTraining.participants && selectedTraining.participants.length > 0" 
                id="modalAttendanceSection" style="margin-top: 20px;">
-            <h4 style="margin-bottom: 10px; color: #3c4043;">Записавшиеся:</h4>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <h4 style="margin: 0; color: #3c4043;">Записавшиеся:</h4>
+              <button 
+                *ngIf="selectedTraining.can_mark_attendance && !isSelectingAttendance"
+                class="modal-btn modal-btn-secondary"
+                style="padding: 6px 12px; font-size: 14px;"
+                (click)="toggleAttendanceSelection()">
+                Выбрать
+              </button>
+              <button 
+                *ngIf="selectedTraining.can_mark_attendance && isSelectingAttendance"
+                class="modal-btn modal-btn-secondary"
+                style="padding: 6px 12px; font-size: 14px;"
+                (click)="toggleAttendanceSelection()">
+                Отмена
+              </button>
+            </div>
             <div class="attendance-list">
-              <div *ngFor="let participant of selectedTraining.participants" class="attendance-item">
+              <div *ngFor="let participant of selectedTraining.participants" class="attendance-item" 
+                   [style.background-color]="isSelectingAttendance && isStudentSelected(participant.student_id) ? '#e8f5e9' : 'transparent'">
+                <div *ngIf="isSelectingAttendance" style="margin-right: 10px;">
+                  <input 
+                    type="checkbox" 
+                    [checked]="isStudentSelected(participant.student_id)"
+                    (change)="toggleStudentSelection(participant.student_id)"
+                    style="width: 18px; height: 18px; cursor: pointer;">
+                </div>
                 <div class="attendance-avatar">
                   {{ participant.student_name ? participant.student_name.charAt(0).toUpperCase() : '?' }}
                 </div>
-                <div>
+                <div style="flex: 1;">
                   <div class="attendance-name">{{ participant.student_name || 'Неизвестный' }}</div>
                   <div class="attendance-time">Записан: {{ formatDateTime(participant.created_at) }}</div>
                 </div>
@@ -149,7 +173,19 @@
               (click)="registerForTraining()">
               Записаться
             </button>
-            <div *ngIf="!selectedTraining.can_register && !selectedTraining.is_registered">
+            <!-- Для тренеров: кнопка подтверждения посещаемости -->
+            <div *ngIf="selectedTraining.can_mark_attendance && isSelectingAttendance">
+              <button class="modal-btn modal-btn-secondary" (click)="toggleAttendanceSelection()">Отмена</button>
+              <button 
+                class="modal-btn modal-btn-primary" 
+                (click)="confirmAttendance()"
+                [disabled]="selectedStudents.size === 0">
+                Подтвердить посещение ({{ selectedStudents.size }})
+              </button>
+            </div>
+            
+            <!-- Для остальных случаев -->
+            <div *ngIf="!selectedTraining.can_register && !selectedTraining.is_registered && !selectedTraining.can_mark_attendance">
               <button class="modal-btn modal-btn-secondary" (click)="closeModal()">Закрыть</button>
               <span style="color: #5f6368; padding: 10px;">
                 <span *ngIf="selectedTraining.is_coach">Только ученики могут записываться на тренировки.</span>
@@ -159,6 +195,11 @@
                   <span *ngIf="selectedTraining.is_past"> (Тренировка прошла)</span>
                 </span>
               </span>
+            </div>
+            
+            <!-- Для тренеров, которые не в режиме выбора посещаемости -->
+            <div *ngIf="selectedTraining.can_mark_attendance && !isSelectingAttendance && !selectedTraining.can_register && !selectedTraining.is_registered">
+              <button class="modal-btn modal-btn-secondary" (click)="closeModal()">Закрыть</button>
             </div>
           </div>
         </div>

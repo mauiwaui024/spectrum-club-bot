@@ -81,6 +81,8 @@ export interface TrainingDetails {
   participants: Participant[];
   participants_count: number;
   is_coach: boolean;
+  is_training_coach: boolean;
+  can_mark_attendance: boolean;
   is_registered: boolean;
   can_register: boolean;
   is_full: boolean;
@@ -89,6 +91,7 @@ export interface TrainingDetails {
 }
 
 export interface Participant {
+  student_id: number;
   student_name: string;
   created_at: string;
 }

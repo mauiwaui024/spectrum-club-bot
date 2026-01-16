@@ -37,6 +37,7 @@ type SubscriptionService interface {
 	UseLesson(subscriptionID int64) error
 	ExtendSubscription(subscriptionID int64, additionalMonths int) error
 	GetSubscriptionHistory(studentID int64) ([]*models.Subscription, error)
+	DecrementRemainingLessons(studentID int64) error
 
 	////i did
 	Create12Unlimited(studentID int64) error
