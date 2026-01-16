@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"sort"
@@ -546,7 +547,6 @@ func (h *Handler) prepareScheduleViewJSON(trainings []models.TrainingSchedule, u
 					0,
 					training.TrainingDate.Location(),
 				)
-				fmt.Println(trainingDateTime)
 				// Проверяем, можно ли записаться
 				// Тренировка должна быть в будущем (дата и время начала)
 				if !isRegistered && trainingDateTime.After(time.Now()) {
@@ -998,17 +998,14 @@ func (h *Handler) TrainingDetailsAPI(w http.ResponseWriter, r *http.Request) {
 	userID, err := h.getUserIDFromRequest(r)
 	var userIDStr string
 	var isCoach bool
-	var userName string
 
 	if err == nil {
 		userIDStr = strconv.FormatInt(userID, 10)
 		user, err := h.userService.GetByID(userID)
 		if err == nil {
 			isCoach = user.Role == "coach"
-			userName = user.FirstName + " " + user.LastName
 		}
 	}
-	fmt.Println(userName)
 	// Получаем тренировку
 	training, err := h.scheduleService.GetTrainingByID(trainingID)
 	if err != nil {
@@ -1039,16 +1036,7 @@ func (h *Handler) TrainingDetailsAPI(w http.ResponseWriter, r *http.Request) {
 		training.TrainingDate.Location(),
 	)
 
-	// Отладочный вывод
 	now := time.Now()
-	fmt.Printf("[TrainingDetailsAPI] TrainingID: %d, UserID: %s\n", trainingID, userIDStr)
-	fmt.Printf("[TrainingDetailsAPI] TrainingDate: %s\n", training.TrainingDate.Format("2006-01-02 15:04:05"))
-	fmt.Printf("[TrainingDetailsAPI] StartTime: %s\n", training.StartTime.Format("15:04:05"))
-	fmt.Printf("[TrainingDetailsAPI] TrainingDateTime (combined): %s\n", trainingDateTime.Format("2006-01-02 15:04:05"))
-	fmt.Printf("[TrainingDetailsAPI] Now: %s\n", now.Format("2006-01-02 15:04:05"))
-	fmt.Printf("[TrainingDetailsAPI] TrainingDateTime.After(Now): %v\n", trainingDateTime.After(now))
-	fmt.Printf("[TrainingDetailsAPI] MaxParticipants: %v, Current participants: %d\n", training.MaxParticipants, len(participants))
-
 	isPast := now.After(trainingDateTime)
 
 	// Проверяем регистрацию пользователя, если userID передан
@@ -1057,13 +1045,7 @@ func (h *Handler) TrainingDetailsAPI(w http.ResponseWriter, r *http.Request) {
 		if err == nil {
 			att, _ := h.attendanceService.GetStudentAttendanceForTraining(int(student.ID), trainingID)
 			isRegistered = att != nil && att.Status == "registered"
-			fmt.Printf("[TrainingDetailsAPI] Student found, ID: %d\n", student.ID)
-			fmt.Printf("[TrainingDetailsAPI] IsRegistered: %v\n", isRegistered)
-		} else {
-			fmt.Printf("[TrainingDetailsAPI] Student not found: %v\n", err)
 		}
-	} else {
-		fmt.Printf("[TrainingDetailsAPI] No userID or isCoach: userIDStr=%s, isCoach=%v\n", userIDStr, isCoach)
 	}
 
 	// Проверяем, можно ли записаться (независимо от того, передан userID или нет)
@@ -1083,11 +1065,7 @@ func (h *Handler) TrainingDetailsAPI(w http.ResponseWriter, r *http.Request) {
 			// Если лимита нет, всегда можно записаться (если тренировка в будущем)
 			canRegister = true
 		}
-	} else {
-		fmt.Printf("[TrainingDetailsAPI] Cannot register: isRegistered=%v, trainingDateTime.After(now)=%v\n", isRegistered, trainingDateTime.After(now))
 	}
-
-	fmt.Printf("[TrainingDetailsAPI] Final values: isRegistered=%v, canRegister=%v, isFull=%v, isPast=%v\n", isRegistered, canRegister, isFull, isPast)
 
 	// Формируем ответ
 	response := map[string]interface{}{
@@ -1117,6 +1095,11 @@ func (h *Handler) TrainingDetailsAPI(w http.ResponseWriter, r *http.Request) {
 
 // RegisterForTraining обрабатывает запись на тренировку
 func (h *Handler) RegisterForTraining(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[RegisterForTraining] Запрос на регистрацию получен")
+	log.Printf("[RegisterForTraining] Method: %s", r.Method)
+	log.Printf("[RegisterForTraining] Headers: X-Telegram-Init-Data = %v (длина: %d)",
+		r.Header.Get("X-Telegram-Init-Data") != "", len(r.Header.Get("X-Telegram-Init-Data")))
+
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -1126,6 +1109,7 @@ func (h *Handler) RegisterForTraining(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseMultipartForm(32 << 20); err != nil {
 		// Если не multipart, пробуем обычную форму
 		if err := r.ParseForm(); err != nil {
+			log.Printf("[RegisterForTraining] Ошибка парсинга формы: %v", err)
 			http.Error(w, "Failed to parse form: "+err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -1133,6 +1117,8 @@ func (h *Handler) RegisterForTraining(w http.ResponseWriter, r *http.Request) {
 
 	// Получаем параметры из формы
 	trainingIDStr := r.FormValue("training_id")
+	log.Printf("[RegisterForTraining] training_id из формы: %s", trainingIDStr)
+
 	if trainingIDStr == "" {
 		http.Error(w, "Missing training_id", http.StatusBadRequest)
 		return
@@ -1147,10 +1133,17 @@ func (h *Handler) RegisterForTraining(w http.ResponseWriter, r *http.Request) {
 	// Получаем userID из initData (безопасный способ) или из формы (fallback)
 	userID, authErr := h.getUserIDFromRequest(r)
 	if authErr != nil {
+		log.Printf("[RegisterForTraining] ОШИБКА аутентификации через initData: %v", authErr)
+		log.Printf("[RegisterForTraining] initData в заголовке: %v (длина: %d)",
+			r.Header.Get("X-Telegram-Init-Data") != "", len(r.Header.Get("X-Telegram-Init-Data")))
+
 		// Fallback: из формы (для обратной совместимости)
 		userIDStr := r.FormValue("user_id")
+		log.Printf("[RegisterForTraining] Пробуем fallback: user_id из формы: %s", userIDStr)
+
 		if userIDStr == "" {
-			http.Error(w, "Authentication required", http.StatusUnauthorized)
+			log.Printf("[RegisterForTraining] ❌ Аутентификация не удалась: нет ни initData, ни user_id")
+			http.Error(w, "Authentication required: Необходимо войти в систему. Пожалуйста, откройте календарь через Telegram бота.", http.StatusUnauthorized)
 			return
 		}
 		userID, err = strconv.ParseInt(userIDStr, 10, 64)
@@ -1158,6 +1151,9 @@ func (h *Handler) RegisterForTraining(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Invalid user ID", http.StatusBadRequest)
 			return
 		}
+		log.Printf("[RegisterForTraining] ✅ Использован fallback: userID из формы: %d", userID)
+	} else {
+		log.Printf("[RegisterForTraining] ✅ Аутентификация успешна через initData, userID: %d", userID)
 	}
 
 	// Получаем студента по userID
@@ -1333,21 +1329,30 @@ func (h *Handler) CheckRegistration(w http.ResponseWriter, r *http.Request) {
 // verifyTelegramWebAppData проверяет подлинность Telegram WebApp initData
 // Возвращает telegram_id если данные валидны, иначе ошибку
 func (h *Handler) verifyTelegramWebAppData(initData string) (int64, error) {
+	log.Printf("[verifyTelegramWebAppData] Начало проверки initData, длина: %d", len(initData))
+
 	if h.botToken == "" {
+		log.Printf("[verifyTelegramWebAppData] ОШИБКА: bot token не настроен")
 		return 0, fmt.Errorf("bot token not configured")
 	}
 
 	// Парсим initData
 	parsed, err := url.ParseQuery(initData)
 	if err != nil {
+		log.Printf("[verifyTelegramWebAppData] ОШИБКА: неверный формат initData: %v", err)
 		return 0, fmt.Errorf("invalid initData format: %v", err)
 	}
+
+	log.Printf("[verifyTelegramWebAppData] initData распарсен, параметров: %d", len(parsed))
 
 	// Извлекаем hash и остальные параметры
 	hash := parsed.Get("hash")
 	if hash == "" {
+		log.Printf("[verifyTelegramWebAppData] ОШИБКА: hash не найден в initData")
 		return 0, fmt.Errorf("hash not found in initData")
 	}
+
+	log.Printf("[verifyTelegramWebAppData] hash найден: %s", hash[:min(20, len(hash))]+"...")
 
 	// Удаляем hash из параметров для проверки
 	parsed.Del("hash")
@@ -1405,6 +1410,14 @@ func (h *Handler) verifyTelegramWebAppData(initData string) (int64, error) {
 	return userData.ID, nil
 }
 
+// min возвращает минимальное из двух чисел
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 // AuthAPI проверяет Telegram WebApp initData и возвращает userID из базы
 func (h *Handler) AuthAPI(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -1453,23 +1466,42 @@ func (h *Handler) getUserIDFromRequest(r *http.Request) (int64, error) {
 	// Пробуем получить из initData (безопасный способ)
 	initData := r.Header.Get("X-Telegram-Init-Data")
 	if initData != "" {
+		log.Printf("[getUserIDFromRequest] initData получен, длина: %d", len(initData))
+		log.Printf("[getUserIDFromRequest] initData (первые 100 символов): %s",
+			func() string {
+				if len(initData) > 100 {
+					return initData[:100] + "..."
+				}
+				return initData
+			}())
+
 		telegramID, err := h.verifyTelegramWebAppData(initData)
 		if err == nil {
+			log.Printf("[getUserIDFromRequest] initData проверен успешно, telegramID: %d", telegramID)
 			user, err := h.userService.GetByTelegramID(telegramID)
 			if err == nil {
+				log.Printf("[getUserIDFromRequest] Пользователь найден, userID: %d", user.ID)
 				return user.ID, nil
+			} else {
+				log.Printf("[getUserIDFromRequest] Пользователь не найден по telegramID %d: %v", telegramID, err)
 			}
+		} else {
+			log.Printf("[getUserIDFromRequest] Ошибка проверки initData: %v", err)
 		}
+	} else {
+		log.Printf("[getUserIDFromRequest] initData не найден в заголовках")
 	}
 
 	// Fallback: из query параметра (для обратной совместимости, но небезопасно)
 	userIDStr := r.URL.Query().Get("user_id")
 	if userIDStr != "" {
+		log.Printf("[getUserIDFromRequest] Используется fallback: user_id из query параметра: %s", userIDStr)
 		userID, err := strconv.ParseInt(userIDStr, 10, 64)
 		if err == nil {
 			return userID, nil
 		}
 	}
 
+	log.Printf("[getUserIDFromRequest] Аутентификация не удалась: initData пустой и user_id не найден")
 	return 0, fmt.Errorf("user not authenticated")
 }

@@ -396,6 +396,28 @@ export class CalendarComponent implements OnInit {
 
     // Обновляем initData перед запросом (на случай, если он появился позже)
     this.calendarService.updateInitData();
+    
+    // Проверяем наличие initData
+    const tg = (window as any).Telegram?.WebApp;
+    const hasInitData = tg && tg.initData && tg.initData.length > 0;
+    
+    console.log('🔍 Проверка перед регистрацией:', {
+      telegramWebAppAvailable: !!tg,
+      initDataAvailable: hasInitData,
+      initDataLength: tg?.initData?.length || 0,
+      platform: tg?.platform || 'unknown'
+    });
+    
+    if (!hasInitData) {
+      console.error('❌ initData пустой! Невозможно записаться без авторизации.');
+      console.error('💡 Убедитесь, что:');
+      console.error('   1. Страница открыта через Telegram WebApp (кнопка в боте)');
+      console.error('   2. URL использует HTTPS (не localhost)');
+      console.error('   3. Telegram WebApp инициализирован');
+      
+      alert('Ошибка: Необходимо войти в систему.\n\nПожалуйста, откройте календарь через Telegram бота (кнопка "📅 Открыть календарь").\n\nЕсли проблема сохраняется, убедитесь, что вы открыли страницу через WebApp, а не через обычный браузер.');
+      return;
+    }
 
     if (!confirm('Записаться на эту тренировку?')) return;
 

@@ -21,24 +21,55 @@ export class CalendarService {
       const tg = (window as any).Telegram?.WebApp;
       if (tg) {
         // Пробуем получить initData (может быть пустым, если не в Telegram)
+        // Важно: initData может появиться не сразу, поэтому проверяем несколько раз
         this.initData = tg.initData || null;
+        
+        // Если initData пустой, но WebApp готов, пробуем подождать и проверить еще раз
+        if (!this.initData && tg.ready) {
+          // Даем Telegram WebApp время на инициализацию
+          setTimeout(() => {
+            this.initData = tg.initData || null;
+            if (this.initData) {
+              console.log('✅ initData получен после задержки:', this.initData.substring(0, 50) + '...');
+            }
+          }, 500);
+        }
+        
+        // Логирование для отладки
+        console.log('🔍 Telegram WebApp Debug:', {
+          available: true,
+          initData: this.initData ? `${this.initData.substring(0, 50)}...` : 'null',
+          initDataLength: this.initData ? this.initData.length : 0,
+          initDataUnsafe: tg.initDataUnsafe || null,
+          ready: tg.ready || false,
+          version: tg.version || 'unknown',
+          platform: tg.platform || 'unknown'
+        });
         
         // Если initData пустой, но WebApp доступен, возможно нужно подождать инициализации
         if (!this.initData && tg.ready) {
           // WebApp готов, но initData пустой - это нормально для тестирования вне Telegram
-          console.log('Telegram WebApp доступен, но initData пустой');
+          console.warn('⚠️ Telegram WebApp доступен, но initData пустой. Проверьте, что страница открыта через Telegram WebApp (не через обычный браузер)');
         }
+      } else {
+        console.warn('⚠️ Telegram WebApp не доступен (открыто не через Telegram)');
       }
     } catch (e) {
       // Telegram WebApp не доступен
-      console.log('Telegram WebApp не доступен:', e);
+      console.error('❌ Telegram WebApp ошибка:', e);
     }
   }
 
   private getHeaders(): HttpHeaders {
+    // Обновляем initData перед каждым запросом (на случай, если он появился позже)
+    this.updateInitData();
+    
     const headers = new HttpHeaders();
     if (this.initData) {
+      console.log('📤 Отправка запроса с initData (длина:', this.initData.length + ')');
       return headers.set('X-Telegram-Init-Data', this.initData);
+    } else {
+      console.warn('⚠️ Отправка запроса БЕЗ initData!');
     }
     return headers;
   }

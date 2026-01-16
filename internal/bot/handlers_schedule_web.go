@@ -27,7 +27,10 @@ func (b *Bot) handleCalendarCommand(message *tgbotapi.Message) {
 		b.api.Send(msg)
 	*/
 
-	// Новый код с WebApp кнопкой
+	// Новый код с WebApp кнопкой (используем WebApp вместо URL для автоматической передачи initData)
+	// ВАЖНО: Для работы WebApp нужен HTTPS URL (не localhost)!
+	// Если используется localhost, initData будет пустым, так как Telegram не может открыть WebApp на localhost
+	// Для тестирования используйте ngrok или другой туннель с HTTPS
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonURL(

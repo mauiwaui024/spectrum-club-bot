@@ -11,6 +11,10 @@ export const routes: Routes = [
   {
     path: 'calendar',
     component: CalendarComponent
+  },
+  {
+    path: 'debug/initdata',
+    loadComponent: () => import('./debug-initdata.component').then(m => m.DebugInitDataComponent)
   }
 ];
 
