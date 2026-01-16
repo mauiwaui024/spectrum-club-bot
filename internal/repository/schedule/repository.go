@@ -359,6 +359,29 @@ func (r *trainingScheduleRepository) Exists(groupID int, startTime time.Time) (b
 	return exists, err
 }
 
+func (r *trainingScheduleRepository) ExistsForCoach(groupID int, coachID int64, startTime time.Time) (bool, error) {
+	query := `
+        SELECT EXISTS(
+            SELECT 1 FROM spectrum.training_schedule 
+            WHERE group_id = $1 
+            AND coach_id = $2
+            AND training_date = $3 
+            AND start_time = $4
+        )
+    `
+
+	var exists bool
+	err := r.db.QueryRow(
+		query,
+		groupID,
+		coachID,
+		startTime.Format("2006-01-02"),
+		startTime.Format("15:04:05"),
+	).Scan(&exists)
+
+	return exists, err
+}
+
 func (r *trainingScheduleRepository) UpdateTrainingPartial(id int, updates map[string]interface{}) error {
 	if len(updates) == 0 {
 		return errors.New("нет полей для обновления")

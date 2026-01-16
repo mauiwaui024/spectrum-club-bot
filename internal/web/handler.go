@@ -111,20 +111,8 @@ func (h *Handler) CalendarAPI(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Получаем тренировки
-	var trainings []models.TrainingSchedule
-	var err error
-
-	if isCoach && userIDStr != "" {
-		// Для тренера получаем его тренировки
-		coach, coachErr := h.coachService.GetCoachByUserID(userID)
-		if coachErr == nil {
-			trainings, err = h.scheduleService.GetCoachSchedule(coach.ID, startDate, endDate)
-		}
-	} else {
-		// Для студента или незарегистрированного пользователя получаем все тренировки
-		trainings, err = h.scheduleService.GetTrainingsByDateRange(startDate, endDate)
-	}
+	// Получаем все тренировки для всех пользователей (тренеры и студенты видят все тренировки)
+	trainings, err := h.scheduleService.GetTrainingsByDateRange(startDate, endDate)
 
 	if err != nil {
 		http.Error(w, "Ошибка получения расписания: "+err.Error(), http.StatusInternalServerError)

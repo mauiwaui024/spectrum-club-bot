@@ -214,6 +214,11 @@ func (r *attendanceRepository) GetStudentAttendanceForTraining(studentID, traini
 }
 
 func (r *attendanceRepository) UpdateAttendance(attendance *models.Attendance) error {
+	// Проверка, что ID установлен
+	if attendance.ID == 0 {
+		return fmt.Errorf("attendance ID не установлен (ID=0)")
+	}
+
 	// Логирование для отладки
 	fmt.Printf("[UpdateAttendance] Обновление записи: id=%d, attended=%v, notes=%s, recorded_by=%v\n",
 		attendance.ID, attendance.Attended, attendance.Notes, attendance.RecordedBy)
@@ -242,6 +247,12 @@ func (r *attendanceRepository) UpdateAttendance(attendance *models.Attendance) e
 
 	if err != nil {
 		return fmt.Errorf("ошибка обновления посещаемости: %w", err)
+	}
+
+	// Проверка, что значение действительно обновилось
+	if returnedAttended != attendance.Attended {
+		return fmt.Errorf("значение attended не обновилось: ожидалось %v, получено %v",
+			attendance.Attended, returnedAttended)
 	}
 
 	fmt.Printf("[UpdateAttendance] Успешно обновлено: id=%d, attended в БД=%v (ожидалось %v)\n",

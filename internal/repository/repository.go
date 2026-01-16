@@ -71,6 +71,7 @@ type TrainingScheduleRepository interface {
 	IsCoachAvailable(coachID int64, date time.Time, startTime, endTime time.Time) (bool, error)
 	GetTrainingParticipantsCount(trainingID int) (int, error)
 	Exists(groupID int, startTime time.Time) (bool, error)
+	ExistsForCoach(groupID int, coachID int64, startTime time.Time) (bool, error)
 }
 
 type WeekScheduleRepository interface {

@@ -157,8 +157,9 @@ func (s *trainingScheduleService) CreateTrainingsFromTemplates(
 				0, 0, time.Local,
 			)
 
-			// Проверяем, не существует ли уже такая тренировка
-			exists, err := s.scheduleRepo.Exists(template.GroupID, trainingStart)
+			// Проверяем, не существует ли уже такая тренировка для этого тренера
+			// Если тренировка существует, но с другим тренером - разрешаем создание
+			exists, err := s.scheduleRepo.ExistsForCoach(template.GroupID, coachID, trainingStart)
 			if err != nil {
 				fmt.Println(err)
 				fmt.Println("ffffffffffffffffffffffffffffffffff")

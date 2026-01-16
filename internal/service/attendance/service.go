@@ -83,17 +83,9 @@ func (s *attendanceService) MarkAttendance(trainingID, studentID, recordedBy int
 		return errors.New("студент не записан на эту тренировку")
 	}
 
-	// Если ученик посетил тренировку (attended = true) и занятие еще не было вычтено,
-	// вычитаем одно занятие из абонемента
-	if attended && !attendance.Attended {
-		// Получаем studentID как int64 для вызова subscriptionService
-		err := s.subscriptionService.DecrementRemainingLessons(int64(studentID))
-		if err != nil {
-			// Логируем ошибку, но не прерываем процесс отметки посещаемости
-			// Возможно, у ученика нет активного абонемента
-			// Это не критично для отметки посещаемости
-		}
-	}
+	// Сохраняем старое значение для проверки необходимости списания абонемента
+	oldAttended := attendance.Attended
+	needsSubscriptionDeduction := attended && !oldAttended
 
 	// Обновляем поля посещаемости
 	attendance.Attended = attended
@@ -102,16 +94,28 @@ func (s *attendanceService) MarkAttendance(trainingID, studentID, recordedBy int
 	attendance.RecordedAt = time.Now()
 
 	// Логирование для отладки
-	fmt.Printf("[MarkAttendance] Обновление посещаемости: trainingID=%d, studentID=%d, attended=%v, attendance.ID=%d\n",
-		trainingID, studentID, attended, attendance.ID)
+	fmt.Printf("[MarkAttendance] Обновление посещаемости: trainingID=%d, studentID=%d, attended=%v (было %v), attendance.ID=%d\n",
+		trainingID, studentID, attended, oldAttended, attendance.ID)
 
-	// Обновляем запись в БД
+	// ВАЖНО: Сначала обновляем attendance в БД
 	err = s.attendanceRepo.UpdateAttendance(attendance)
 	if err != nil {
 		return fmt.Errorf("ошибка обновления посещаемости в БД: %w", err)
 	}
 
 	fmt.Printf("[MarkAttendance] Посещаемость успешно обновлена для studentID=%d, attended=%v\n", studentID, attended)
+
+	// Только после успешного обновления списываем абонемент
+	if needsSubscriptionDeduction {
+		err := s.subscriptionService.DecrementRemainingLessons(int64(studentID))
+		if err != nil {
+			// Логируем ошибку, но не откатываем обновление attendance
+			// Это не критично для отметки посещаемости
+			fmt.Printf("[MarkAttendance] Предупреждение: не удалось списать абонемент для studentID=%d: %v\n", studentID, err)
+		} else {
+			fmt.Printf("[MarkAttendance] Абонемент успешно списан для studentID=%d\n", studentID)
+		}
+	}
 
 	return nil
 }
