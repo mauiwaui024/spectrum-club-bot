@@ -1050,10 +1050,11 @@ func (h *Handler) TrainingDetailsAPI(w http.ResponseWriter, r *http.Request) {
 
 	// Проверяем, можно ли записаться (независимо от того, передан userID или нет)
 	// userID нужен только для самой записи, но для определения can_register достаточно проверить:
-	// 1. Тренировка в будущем (дата и время начала)
-	// 2. Есть свободные места (если установлен лимит)
-	// 3. Пользователь не записан (если userID передан, иначе считаем что не записан)
-	if !isRegistered && trainingDateTime.After(now) {
+	// 1. Пользователь - студент (не тренер)
+	// 2. Тренировка в будущем (дата и время начала)
+	// 3. Есть свободные места (если установлен лимит)
+	// 4. Пользователь не записан (если userID передан, иначе считаем что не записан)
+	if !isCoach && !isRegistered && trainingDateTime.After(now) {
 		if training.MaxParticipants != nil && *training.MaxParticipants > 0 {
 			maxParticipants := *training.MaxParticipants
 			if len(participants) < maxParticipants {
@@ -1062,7 +1063,7 @@ func (h *Handler) TrainingDetailsAPI(w http.ResponseWriter, r *http.Request) {
 				isFull = true
 			}
 		} else {
-			// Если лимита нет, всегда можно записаться (если тренировка в будущем)
+			// Если лимита нет, всегда можно записаться (если тренировка в будущем и пользователь - студент)
 			canRegister = true
 		}
 	}
@@ -1154,6 +1155,20 @@ func (h *Handler) RegisterForTraining(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[RegisterForTraining] ✅ Использован fallback: userID из формы: %d", userID)
 	} else {
 		log.Printf("[RegisterForTraining] ✅ Аутентификация успешна через initData, userID: %d", userID)
+	}
+
+	// Проверяем роль пользователя - только студенты могут записываться на тренировки
+	user, err := h.userService.GetByID(userID)
+	if err != nil {
+		log.Printf("[RegisterForTraining] Ошибка получения пользователя: %v", err)
+		http.Error(w, "User not found: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if user.Role == "coach" {
+		log.Printf("[RegisterForTraining] ❌ Попытка записи тренера на тренировку (userID: %d, role: %s)", userID, user.Role)
+		http.Error(w, "Только ученики могут записываться на тренировки. Тренеры не могут записываться на свои тренировки.", http.StatusForbidden)
+		return
 	}
 
 	// Получаем студента по userID
@@ -1248,6 +1263,19 @@ func (h *Handler) CancelRegistration(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Invalid user ID", http.StatusBadRequest)
 			return
 		}
+	}
+
+	// Проверяем роль пользователя - только студенты могут отменять записи
+	user, err := h.userService.GetByID(userID)
+	if err != nil {
+		http.Error(w, "User not found: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if user.Role == "coach" {
+		log.Printf("[CancelRegistration] ❌ Попытка отмены записи тренером (userID: %d, role: %s)", userID, user.Role)
+		http.Error(w, "Только ученики могут отменять записи на тренировки.", http.StatusForbidden)
+		return
 	}
 
 	// Получаем студента по userID

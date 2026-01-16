@@ -152,9 +152,12 @@
             <div *ngIf="!selectedTraining.can_register && !selectedTraining.is_registered">
               <button class="modal-btn modal-btn-secondary" (click)="closeModal()">Закрыть</button>
               <span style="color: #5f6368; padding: 10px;">
-                Невозможно записаться
-                <span *ngIf="selectedTraining.is_full"> (Мест нет)</span>
-                <span *ngIf="selectedTraining.is_past"> (Тренировка прошла)</span>
+                <span *ngIf="selectedTraining.is_coach">Только ученики могут записываться на тренировки.</span>
+                <span *ngIf="!selectedTraining.is_coach">
+                  Невозможно записаться
+                  <span *ngIf="selectedTraining.is_full"> (Мест нет)</span>
+                  <span *ngIf="selectedTraining.is_past"> (Тренировка прошла)</span>
+                </span>
               </span>
             </div>
           </div>
