@@ -59,7 +59,11 @@
           <div class="card-body">
             <div class="lessons-info">
               <div class="lessons-count">
-                <span class="count-label">Использовано {{ sub.used_lessons }} из {{ sub.total_lessons }} занятий</span>
+                <span class="count-large">{{ sub.remaining_lessons }}</span>
+                <span class="count-label">из {{ sub.total_lessons }} занятий</span>
+              </div>
+              <div class="progress-bar">
+                <div class="progress-fill" [style.width.%]="getProgressPercentage(sub)"></div>
               </div>
             </div>
             <div class="info-grid">
