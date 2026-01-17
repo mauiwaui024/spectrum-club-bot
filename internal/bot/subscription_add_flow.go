@@ -116,7 +116,7 @@ func getStudentDisplayName(student *models.User) string {
 // 	}
 
 // 	if messageText == "❌ Отмена" {
-// 		b.cancelOperation(chatID)
+// 		b.cancelOperation(chatID, nil)
 // 		return
 // 	}
 
@@ -155,7 +155,7 @@ func (b *Bot) handleStudentSelection(chatID int64, messageText string) {
 	}
 
 	if messageText == "❌ Отмена" {
-		b.cancelOperation(chatID)
+		b.cancelOperation(chatID, nil)
 		return
 	}
 
@@ -199,7 +199,7 @@ func (b *Bot) handleSubscriptionTypeSelection(chatID int64, messageText string) 
 	}
 
 	if messageText == "❌ Отмена" {
-		b.cancelOperation(chatID)
+		b.cancelOperation(chatID, nil)
 		return
 	}
 
@@ -265,7 +265,7 @@ func (b *Bot) handleConfirmation(chatID int64, messageText string) {
 	case "✅ Подтвердить":
 		b.addSubscription(chatID, session)
 	case "❌ Отмена":
-		b.cancelOperation(chatID)
+		b.cancelOperation(chatID, nil)
 	default:
 		b.sendError(chatID, "❌ Неизвестная команда")
 	}
@@ -286,13 +286,11 @@ func (b *Bot) addSubscription(chatID int64, session *UserSession) {
 
 	if err != nil {
 		b.sendError(chatID, "❌ Ошибка при добавлении абонемента: "+err.Error())
+		b.resetSession(chatID)
 	} else {
-		msg := tgbotapi.NewMessage(chatID, "✅ Абонемент успешно добавлен!")
-		msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
-		b.api.Send(msg)
+		b.showMainKeyboardAfterOperation(chatID, "✅ Абонемент успешно добавлен!")
+		b.resetSession(chatID)
 	}
-
-	b.resetSession(chatID)
 }
 
 /////////////////////
@@ -303,11 +301,33 @@ func (b *Bot) resetSession(chatID int64) {
 	delete(b.userSessions, chatID)
 }
 
-func (b *Bot) cancelOperation(chatID int64) {
+func (b *Bot) cancelOperation(chatID int64, user *models.User) {
 	msg := tgbotapi.NewMessage(chatID, "❌ Операция отменена")
-	msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
+	if user != nil {
+		msg.ReplyMarkup = createMainKeyboard(user.Role)
+	} else {
+		// Если пользователь не передан, получаем его
+		userProfile, _, _, _, err := b.UserService.GetUserProfile(chatID)
+		if err == nil && userProfile != nil {
+			msg.ReplyMarkup = createMainKeyboard(userProfile.Role)
+		} else {
+			msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
+		}
+	}
 	b.api.Send(msg)
 	b.resetSession(chatID)
+}
+
+// showMainKeyboardAfterOperation показывает главную клавиатуру после завершения операции
+func (b *Bot) showMainKeyboardAfterOperation(chatID int64, message string) {
+	user, _, _, _, err := b.UserService.GetUserProfile(chatID)
+	msg := tgbotapi.NewMessage(chatID, message)
+	if err == nil && user != nil {
+		msg.ReplyMarkup = createMainKeyboard(user.Role)
+	} else {
+		msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
+	}
+	b.api.Send(msg)
 }
 
 func (b *Bot) sendError(chatID int64, text string) {

@@ -61,7 +61,7 @@ func (b *Bot) handleStudentSelectionForDeletion(chatID int64, messageText string
 	}
 
 	if messageText == "❌ Отмена" {
-		b.cancelOperation(chatID)
+		b.cancelOperation(chatID, nil)
 		return
 	}
 
@@ -140,7 +140,7 @@ func (b *Bot) handleSubscriptionSelectionForDeletion(chatID int64, messageText s
 	}
 
 	if messageText == "❌ Отмена" {
-		b.cancelOperation(chatID)
+		b.cancelOperation(chatID, nil)
 		return
 	}
 
@@ -207,7 +207,7 @@ func (b *Bot) handleSubscriptionDeletionConfirmation(chatID int64, messageText s
 	case "✅ Удалить абонемент":
 		b.deleteSubscription(chatID, session)
 	case "❌ Отмена":
-		b.cancelOperation(chatID)
+		b.cancelOperation(chatID, nil)
 	default:
 		b.sendError(chatID, "❌ Неизвестная команда")
 	}
@@ -218,12 +218,10 @@ func (b *Bot) deleteSubscription(chatID int64, session *UserSession) {
 	if err != nil {
 		b.sendError(chatID, "❌ Ошибка при удалении абонемента: "+err.Error())
 	} else {
-		msg := tgbotapi.NewMessage(chatID,
-			fmt.Sprintf("✅ Абонемент успешно удален у ученика %s %s!",
-				session.SelectedStudentForDeletion.FirstName,
-				session.SelectedStudentForDeletion.LastName))
-		msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
-		b.api.Send(msg)
+		msgText := fmt.Sprintf("✅ Абонемент успешно удален у ученика %s %s!",
+			session.SelectedStudentForDeletion.FirstName,
+			session.SelectedStudentForDeletion.LastName)
+		b.showMainKeyboardAfterOperation(chatID, msgText)
 	}
 
 	b.resetSession(chatID)

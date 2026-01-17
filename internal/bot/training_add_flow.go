@@ -39,7 +39,7 @@ func (b *Bot) handleGroupSelection(chatID int64, messageText string) {
 	}
 
 	if messageText == "❌ Отмена" {
-		b.cancelOperation(chatID)
+		b.cancelOperation(chatID, nil)
 		return
 	}
 
@@ -94,7 +94,7 @@ func (b *Bot) handleDateSelection(chatID int64, messageText string) {
 	}
 
 	if messageText == "❌ Отмена" {
-		b.cancelOperation(chatID)
+		b.cancelOperation(chatID, nil)
 		return
 	}
 
@@ -164,7 +164,7 @@ func (b *Bot) handleTimeSelection(chatID int64, messageText string) {
 	}
 
 	if messageText == "❌ Отмена" {
-		b.cancelOperation(chatID)
+		b.cancelOperation(chatID, nil)
 		return
 	}
 
@@ -225,7 +225,7 @@ func (b *Bot) handleDurationSelection(chatID int64, messageText string) {
 	}
 
 	if messageText == "❌ Отмена" {
-		b.cancelOperation(chatID)
+		b.cancelOperation(chatID, nil)
 		return
 	}
 
@@ -310,8 +310,8 @@ func (b *Bot) handleTrainingConfirmation(chatID int64, messageText string) {
 	case "✅ Создать тренировку":
 		b.createTraining(chatID, session)
 	case "❌ Отмена":
-		b.cancelOperation(chatID)
-	default:
+		b.cancelOperation(chatID, nil)
+		default:
 		b.sendError(chatID, "❌ Неизвестная команда")
 	}
 }
@@ -345,11 +345,9 @@ func (b *Bot) createTraining(chatID int64, session *UserSession) {
 	err = b.ScheduleService.CreateTraining(training)
 	if err != nil {
 		b.sendError(chatID, "❌ Ошибка при создании тренировки: "+err.Error())
+		b.resetSession(chatID)
 	} else {
-		msg := tgbotapi.NewMessage(chatID, "✅ Тренировка успешно создана!")
-		msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
-		b.api.Send(msg)
+		b.showMainKeyboardAfterOperation(chatID, "✅ Тренировка успешно создана!")
+		b.resetSession(chatID)
 	}
-
-	b.resetSession(chatID)
 }

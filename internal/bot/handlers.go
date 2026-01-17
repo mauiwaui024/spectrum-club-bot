@@ -171,6 +171,8 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) {
 		b.showPersonalAccount(message.Chat.ID, user)
 	case "👥 Мои ученики":
 		b.showAllStudens(message.Chat.ID, user)
+	case "📅 Календарь":
+		b.handleCalendarCommand(message)
 	case "📅 Управление расписанием":
 		b.showScheduleManagementMenu(message.Chat.ID, user)
 	case "💳 Управление абонементами":
@@ -210,6 +212,8 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) {
 		b.handleMySubscription(message.Chat.ID, user)
 		return
 
+	case "❌ Отмена":
+		b.cancelOperation(message.Chat.ID, user)
 	case "◀️ Назад":
 		b.sendWelcomeMessage(message.Chat.ID, user)
 	default:

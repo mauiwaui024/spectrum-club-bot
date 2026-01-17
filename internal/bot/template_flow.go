@@ -49,7 +49,7 @@ func (b *Bot) handleWeeksCountSelection(chatID int64, messageText string) {
 	}
 
 	if messageText == "❌ Отмена" {
-		b.cancelOperation(chatID)
+		b.cancelOperation(chatID, nil)
 		return
 	}
 
@@ -113,7 +113,7 @@ func (b *Bot) handleWeeklyScheduleConfirmation(chatID int64, user *models.User, 
 	case "✅ Создать расписание":
 		b.createWeeklySchedule(chatID, user)
 	case "❌ Отмена":
-		b.cancelOperation(chatID)
+		b.cancelOperation(chatID, nil)
 	default:
 		b.sendError(chatID, "❌ Неизвестная команда")
 	}
@@ -165,10 +165,7 @@ func (b *Bot) createWeeklySchedule(chatID int64, user *models.User) {
 		session.WeeksCount,
 	)
 
-	msg = tgbotapi.NewMessage(chatID, msgText)
-	msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
-	b.api.Send(msg)
-
+	b.showMainKeyboardAfterOperation(chatID, msgText)
 	b.resetSession(chatID)
 }
 

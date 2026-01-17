@@ -53,7 +53,7 @@ func (b *Bot) handleDateSelectionForTrainingForEdit(chatID int64, messageText st
 	}
 
 	if messageText == "❌ Отмена" {
-		b.cancelOperation(chatID)
+		b.cancelOperation(chatID, nil)
 		return
 	}
 
@@ -159,7 +159,7 @@ func (b *Bot) handleTrainingSelectionForEdit(chatID int64, messageText string) {
 	}
 
 	if messageText == "❌ Отмена" {
-		b.cancelOperation(chatID)
+		b.cancelOperation(chatID, nil)
 		return
 	}
 
@@ -238,7 +238,7 @@ func (b *Bot) handleFieldSelectionForEdit(chatID int64, messageText string) {
 		session.State = StateConfirmingDeletion
 		b.showDeletionTrainingConfirmation(chatID)
 	case "❌ Отмена":
-		b.cancelOperation(chatID)
+		b.cancelOperation(chatID, nil)
 	default:
 		b.sendError(chatID, "❌ Выберите один из вариантов")
 	}
@@ -264,7 +264,7 @@ func (b *Bot) handleTimeEdit(chatID int64, messageText string) {
 	}
 
 	if messageText == "❌ Отмена" {
-		b.cancelOperation(chatID)
+		b.cancelOperation(chatID, nil)
 		return
 	}
 
@@ -382,7 +382,7 @@ func (b *Bot) handlePlaceEdit(chatID int64, messageText string) {
 	}
 
 	if messageText == "❌ Отмена" {
-		b.cancelOperation(chatID)
+		b.cancelOperation(chatID, nil)
 		return
 	}
 
