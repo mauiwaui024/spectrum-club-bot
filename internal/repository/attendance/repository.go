@@ -144,30 +144,6 @@ func (r *attendanceRepository) GetAttendanceByStudent(studentID int, start, end 
 	return attendances, nil
 }
 
-// func (r *attendanceRepository) GetStudentAttendanceForTraining(studentID, trainingID int) (*models.Attendance, error) {
-// 	query := `
-// 		SELECT
-// 			a.id, a.training_id, a.student_id, a.attended, a.notes,
-// 			a.recorded_by, a.recorded_at
-// 		FROM spectrum.attendance a
-// 		WHERE a.student_id = $1 AND a.training_id = $2
-// 	`
-
-// 	attendance := &models.Attendance{}
-// 	err := r.db.QueryRow(query, studentID, trainingID).Scan(
-// 		&attendance.ID, &attendance.TrainingID, &attendance.StudentID,
-// 		&attendance.Attended, &attendance.Notes, &attendance.RecordedBy,
-// 		&attendance.RecordedAt, &attendance.Status, &attendance.CreatedAt, &attendance.UpdatedAt,
-// 	)
-// 	if err != nil {
-// 		if err == sql.ErrNoRows {
-// 			return nil, nil
-// 		}
-// 		return nil, err
-// 	}
-// 	return attendance, nil
-// }
-
 func (r *attendanceRepository) GetStudentAttendanceForTraining(studentID, trainingID int) (*models.Attendance, error) {
 	query := `
         SELECT 
@@ -346,7 +322,7 @@ func (r *attendanceRepository) GetParticipants(trainingID int) ([]models.Attenda
         FROM spectrum.attendance a
         LEFT JOIN spectrum.students s ON a.student_id = s.id
         LEFT JOIN spectrum.users u ON s.user_id = u.id
-        WHERE a.training_id = $1 AND a.status = 'registered'
+        WHERE a.training_id = $1
         ORDER BY a.created_at ASC
     `
 
