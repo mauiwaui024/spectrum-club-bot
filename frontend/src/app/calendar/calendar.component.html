@@ -24,6 +24,26 @@
     </div>
   </div>
 
+  <!-- Navigation Menu -->
+  <div class="nav-menu">
+    <a [routerLink]="['/calendar']" routerLinkActive="active" class="nav-item">
+      <span class="nav-icon">📅</span>
+      <span class="nav-text">Календарь</span>
+    </a>
+    <a [routerLink]="['/my-registrations']" routerLinkActive="active" class="nav-item">
+      <span class="nav-icon">📝</span>
+      <span class="nav-text">Мои записи</span>
+    </a>
+    <a [routerLink]="['/my-subscription']" routerLinkActive="active" class="nav-item">
+      <span class="nav-icon">🎫</span>
+      <span class="nav-text">Абонемент</span>
+    </a>
+    <a [routerLink]="['/profile']" routerLinkActive="active" class="nav-item">
+      <span class="nav-icon">👤</span>
+      <span class="nav-text">Профиль</span>
+    </a>
+  </div>
+
   <!-- Navigation -->
   <div class="calendar-nav">
     <button 

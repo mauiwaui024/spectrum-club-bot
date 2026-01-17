@@ -42,10 +42,7 @@ const (
 	StateSelectingSchedulePeriod // Новое состояние для выбора периода расписания
 	StateConfirmingDeletion      // Новое состояние для подтверждения удаления
 
-	// Состояния для записи на тренировку
-	StateSelectingTrainingDateToSignUp
-	StateSelectingTrainingToSignUp
-	StateConfirmingTrainingSignUp
+	// Состояния для записи на тренировку - удалены, функционал перенесен в WebApp
 )
 
 type UserSession struct {
@@ -73,10 +70,7 @@ type UserSession struct {
 	SelectedTrainingID     int
 	AvailableTrainingsEdit []models.TrainingSchedule
 
-	// Поля для записи на тренировку
-	SelectedTrainingForSignUpID int
-	AvailableTrainingsForSignUp []models.TrainingSchedule
-	SelectedStudentForSignUpID  int
+	// Поля для записи на тренировку - удалены, функционал перенесен в WebApp
 
 	StudentsForSelection []*models.User
 }

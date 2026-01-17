@@ -28,20 +28,10 @@ func createMainKeyboard(role string) tgbotapi.ReplyKeyboardMarkup {
 }
 
 func createStudentMainKeyboard() tgbotapi.ReplyKeyboardMarkup {
+	// Для учеников весь функционал доступен через WebApp (календарь)
 	return tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton("📝 Записаться на тренировку"),
-			tgbotapi.NewKeyboardButton("📅 Мои записи"),
-		),
-		tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton("👤 Личный кабинет"),
-			tgbotapi.NewKeyboardButton("🎫 Мой абонемент"),
-		),
-		tgbotapi.NewKeyboardButtonRow(
 			tgbotapi.NewKeyboardButton("📅 Календарь"),
-		),
-		tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton("◀️ Назад"),
 		),
 	)
 }

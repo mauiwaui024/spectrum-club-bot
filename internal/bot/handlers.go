@@ -99,16 +99,7 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) {
 		case StateConfirmingDeletion:
 			b.handleDeletionConfirmation(chatID, message.Text)
 			return
-			// Состояния для записи на тренировку
-		case StateSelectingTrainingDateToSignUp:
-			b.handleDateSelectionForTrainingSignUp(chatID, message.Text)
-			return
-		case StateSelectingTrainingToSignUp:
-			b.handleTrainingSelectionForSignUp(chatID, message.Text)
-			return
-		case StateConfirmingTrainingSignUp:
-			b.handleTrainingSignUpConfirmation(chatID, message.Text)
-			return
+			// Состояния для записи на тренировку - удалены, функционал перенесен в WebApp
 		}
 	}
 
@@ -168,7 +159,12 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) {
 	// Обрабатываем текст сообщений (только если нет активной сессии)
 	switch message.Text {
 	case "👤 Личный кабинет":
-		b.showPersonalAccount(message.Chat.ID, user)
+		// Для учеников перенаправляем в WebApp, для тренеров показываем личный кабинет
+		if user.Role == "student" {
+			b.handleCalendarCommand(message)
+		} else {
+			b.showPersonalAccount(message.Chat.ID, user)
+		}
 	case "👥 Мои ученики":
 		b.showAllStudens(message.Chat.ID, user)
 	case "📅 Календарь":
@@ -201,16 +197,8 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) {
 	case "👥 Список учеников с абонементами":
 		b.showAllStudens(message.Chat.ID, user)
 
-		// Для студентов
-	case "📝 Записаться на тренировку":
-		b.handleSignUpForTraining(message.Chat.ID, user)
-		return
-	case "📅 Мои записи":
-		b.handleMyRegistrations(message.Chat.ID, user)
-		return
-	case "🎫 Мой абонемент":
-		b.handleMySubscription(message.Chat.ID, user)
-		return
+		// Для студентов - функционал перенесен в WebApp
+		// Все операции доступны через команду /schedule или кнопку "📅 Календарь"
 
 	case "❌ Отмена":
 		b.cancelOperation(message.Chat.ID, user)
@@ -296,7 +284,15 @@ func (b *Bot) sendWelcomeMessage(chatID int64, user *models.User) {
 	} else {
 		text = `🏔 Добро пожаловать в клуб скалолазания!
 
-Выберите нужный раздел:`
+📱 Весь функционал доступен через календарь.
+Нажмите кнопку "📅 Календарь" или отправьте команду /schedule для открытия приложения.
+
+В приложении вы можете:
+• 📅 Просматривать расписание тренировок
+• 📝 Записываться на тренировки
+• 📋 Просматривать свои записи
+• 🎫 Просматривать информацию об абонементе
+• 👤 Просматривать свой профиль`
 	}
 
 	msg := tgbotapi.NewMessage(chatID, text)

@@ -1492,3 +1492,250 @@ func (h *Handler) sendLessonDeductionNotification(studentID int, trainingID int)
 
 	log.Printf("[sendLessonDeductionNotification] Уведомление успешно отправлено студенту %d (telegramID: %d)", studentID, user.TelegramID)
 }
+
+// MyRegistrationsAPI возвращает список записей ученика на тренировки
+func (h *Handler) MyRegistrationsAPI(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Получаем userID из initData или query параметра (fallback)
+	userID, err := h.getUserIDFromRequest(r)
+	if err != nil {
+		// Fallback: из query параметра (для обратной совместимости)
+		userIDStr := r.URL.Query().Get("user_id")
+		if userIDStr == "" {
+			http.Error(w, "Authentication required", http.StatusUnauthorized)
+			return
+		}
+		userID, _ = strconv.ParseInt(userIDStr, 10, 64)
+	}
+
+	// Проверяем роль пользователя - только студенты
+	user, err := h.userService.GetByID(userID)
+	if err != nil {
+		http.Error(w, "User not found: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if user.Role != "student" {
+		http.Error(w, "This endpoint is only for students", http.StatusForbidden)
+		return
+	}
+
+	// Получаем студента
+	student, err := h.studentService.GetStudentByUserID(userID)
+	if err != nil {
+		http.Error(w, "Student not found: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Получаем записи на тренировки за последние 30 дней и будущие
+	start := time.Now().AddDate(0, 0, -30)
+	end := time.Now().AddDate(0, 0, 30)
+
+	attendances, err := h.attendanceService.GetAttendanceByStudent(int(student.ID), start, end)
+	if err != nil {
+		http.Error(w, "Error getting registrations: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Группируем записи по дате и статусу
+	var upcomingTrainings []map[string]interface{}
+	var pastTrainings []map[string]interface{}
+
+	now := time.Now()
+	for _, attendance := range attendances {
+		training, err := h.scheduleService.GetTrainingByID(attendance.TrainingID)
+		if err != nil {
+			continue
+		}
+
+		// Получаем название группы
+		groupName := training.GroupName
+		if groupName == "" {
+			groupName = "Неизвестная группа"
+		}
+
+		// Получаем тренера
+		coachName := "Неизвестный тренер"
+		if training.CoachID != nil {
+			coach, err := h.coachService.GetByCoachID(*training.CoachID)
+			if err == nil && coach != nil {
+				coachUser, err := h.userService.GetByID(coach.UserID)
+				if err == nil && coachUser != nil {
+					coachName = coachUser.FirstName + " " + coachUser.LastName
+				}
+			}
+		}
+
+		trainingData := map[string]interface{}{
+			"attendance_id": attendance.ID,
+			"training_id":   training.ID,
+			"date":          training.TrainingDate.Format("2006-01-02"),
+			"time":          training.StartTime.Format("15:04"),
+			"end_time":      training.EndTime.Format("15:04"),
+			"group_name":    groupName,
+			"coach_name":    coachName,
+			"description":   training.Description,
+			"status":        attendance.Status,
+			"attended":      attendance.Attended,
+			"notes":         attendance.Notes,
+		}
+
+		if training.TrainingDate.After(now) {
+			upcomingTrainings = append(upcomingTrainings, trainingData)
+		} else {
+			pastTrainings = append(pastTrainings, trainingData)
+		}
+	}
+
+	response := map[string]interface{}{
+		"upcoming": upcomingTrainings,
+		"past":     pastTrainings,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// MySubscriptionAPI возвращает информацию об абонементе ученика
+func (h *Handler) MySubscriptionAPI(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Получаем userID из initData или query параметра (fallback)
+	userID, err := h.getUserIDFromRequest(r)
+	if err != nil {
+		// Fallback: из query параметра (для обратной совместимости)
+		userIDStr := r.URL.Query().Get("user_id")
+		if userIDStr == "" {
+			http.Error(w, "Authentication required", http.StatusUnauthorized)
+			return
+		}
+		userID, _ = strconv.ParseInt(userIDStr, 10, 64)
+	}
+
+	// Проверяем роль пользователя - только студенты
+	user, err := h.userService.GetByID(userID)
+	if err != nil {
+		http.Error(w, "User not found: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if user.Role != "student" {
+		http.Error(w, "This endpoint is only for students", http.StatusForbidden)
+		return
+	}
+
+	// Получаем студента
+	student, err := h.studentService.GetStudentByUserID(userID)
+	if err != nil {
+		http.Error(w, "Student not found: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Получаем абонементы
+	subscriptions, err := h.subscriptionService.GetSubscriptionsByStudentID(student.ID)
+	if err != nil {
+		http.Error(w, "Error getting subscriptions: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var activeSubscriptions []map[string]interface{}
+	var expiredSubscriptions []map[string]interface{}
+	now := time.Now()
+
+	for _, subscription := range subscriptions {
+		subData := map[string]interface{}{
+			"id":                subscription.ID,
+			"total_lessons":     subscription.TotalLessons,
+			"remaining_lessons":  subscription.RemainingLessons,
+			"used_lessons":       subscription.TotalLessons - subscription.RemainingLessons,
+			"start_date":         subscription.StartDate.Format("2006-01-02"),
+			"end_date":           subscription.EndDate.Format("2006-01-02"),
+			"created_at":         subscription.CreatedAt.Format("2006-01-02"),
+		}
+
+		if subscription.RemainingLessons > 0 && subscription.EndDate.After(now) {
+			activeSubscriptions = append(activeSubscriptions, subData)
+		} else {
+			status := "used"
+			if subscription.RemainingLessons > 0 && subscription.EndDate.Before(now) {
+				status = "expired"
+			}
+			subData["status"] = status
+			expiredSubscriptions = append(expiredSubscriptions, subData)
+		}
+	}
+
+	response := map[string]interface{}{
+		"active":   activeSubscriptions,
+		"expired":  expiredSubscriptions,
+		"has_active": len(activeSubscriptions) > 0,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// MyProfileAPI возвращает профиль ученика
+func (h *Handler) MyProfileAPI(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Получаем userID из initData или query параметра (fallback)
+	userID, err := h.getUserIDFromRequest(r)
+	if err != nil {
+		// Fallback: из query параметра (для обратной совместимости)
+		userIDStr := r.URL.Query().Get("user_id")
+		if userIDStr == "" {
+			http.Error(w, "Authentication required", http.StatusUnauthorized)
+			return
+		}
+		userID, _ = strconv.ParseInt(userIDStr, 10, 64)
+	}
+
+	// Проверяем роль пользователя - только студенты
+	user, err := h.userService.GetByID(userID)
+	if err != nil {
+		http.Error(w, "User not found: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if user.Role != "student" {
+		http.Error(w, "This endpoint is only for students", http.StatusForbidden)
+		return
+	}
+
+	// Получаем студента
+	student, err := h.studentService.GetStudentByUserID(userID)
+	if err != nil {
+		http.Error(w, "Student not found: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	response := map[string]interface{}{
+		"user": map[string]interface{}{
+			"id":            user.ID,
+			"first_name":    user.FirstName,
+			"last_name":     user.LastName,
+			"username":      user.Username,
+			"role":          user.Role,
+			"registered_at": user.RegisteredAt.Format("2006-01-02"),
+		},
+		"student": map[string]interface{}{
+			"id":             student.ID,
+			"athletic_title": student.AtleticTitle,
+			"created_at":      student.CreatedAt.Format("2006-01-02"),
+		},
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}

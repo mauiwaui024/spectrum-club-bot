@@ -1,0 +1,82 @@
+<div class="container">
+  <!-- Header -->
+  <div class="header">
+    <h1>🎫 Мой абонемент</h1>
+    <a routerLink="/calendar" class="back-link">← Назад к календарю</a>
+  </div>
+
+  <!-- Loading -->
+  <div *ngIf="loading" class="loading">Загрузка...</div>
+
+  <!-- Error -->
+  <div *ngIf="error" class="error">{{ error }}</div>
+
+  <!-- Content -->
+  <div *ngIf="!loading && !error && subscription">
+    <!-- Active Subscriptions -->
+    <div *ngIf="subscription.active.length > 0" class="section">
+      <h2>✅ Активные абонементы</h2>
+      <div class="subscriptions-list">
+        <div *ngFor="let sub of subscription.active" class="subscription-card active">
+          <div class="card-header">
+            <h3>Абонемент #{{ sub.id }}</h3>
+            <span class="status-badge status-active">Активен</span>
+          </div>
+          <div class="card-body">
+            <div class="lessons-info">
+              <div class="lessons-count">
+                <span class="count-large">{{ sub.remaining_lessons }}</span>
+                <span class="count-label">из {{ sub.total_lessons }} занятий</span>
+              </div>
+              <div class="progress-bar">
+                <div class="progress-fill" [style.width.%]="getProgressPercentage(sub)"></div>
+              </div>
+            </div>
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="label">📅 Действует до:</span>
+                <span class="value">{{ formatDate(sub.end_date) }}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">📅 Начало действия:</span>
+                <span class="value">{{ formatDate(sub.start_date) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Expired Subscriptions -->
+    <div *ngIf="subscription.expired.length > 0" class="section">
+      <h2>⏰ История абонементов</h2>
+      <div class="subscriptions-list">
+        <div *ngFor="let sub of subscription.expired" class="subscription-card expired">
+          <div class="card-header">
+            <h3>Абонемент #{{ sub.id }}</h3>
+            <span class="status-badge status-expired">{{ getStatusText(sub) }}</span>
+          </div>
+          <div class="card-body">
+            <div class="lessons-info">
+              <div class="lessons-count">
+                <span class="count-label">Использовано {{ sub.used_lessons }} из {{ sub.total_lessons }} занятий</span>
+              </div>
+            </div>
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="label">📅 Период:</span>
+                <span class="value">{{ formatDate(sub.start_date) }} - {{ formatDate(sub.end_date) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Empty State -->
+    <div *ngIf="!subscription.has_active && subscription.expired.length === 0" class="empty-state">
+      <p>📭 У вас нет активных абонементов.</p>
+      <p class="hint">Обратитесь к тренеру для приобретения абонемента.</p>
+    </div>
+  </div>
+</div>

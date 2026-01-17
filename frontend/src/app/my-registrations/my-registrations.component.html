@@ -1,0 +1,80 @@
+<div class="container">
+  <!-- Header -->
+  <div class="header">
+    <h1>📅 Мои записи</h1>
+    <a routerLink="/calendar" class="back-link">← Назад к календарю</a>
+  </div>
+
+  <!-- Loading -->
+  <div *ngIf="loading" class="loading">Загрузка...</div>
+
+  <!-- Error -->
+  <div *ngIf="error" class="error">{{ error }}</div>
+
+  <!-- Content -->
+  <div *ngIf="!loading && !error && registrations">
+    <!-- Upcoming Trainings -->
+    <div *ngIf="registrations.upcoming.length > 0" class="section">
+      <h2>📅 Предстоящие тренировки</h2>
+      <div class="registrations-list">
+        <div *ngFor="let reg of registrations.upcoming" class="registration-card">
+          <div class="card-header">
+            <h3>{{ formatDate(reg.date) }}</h3>
+            <span [class]="'status-badge ' + getStatusClass(reg)">{{ getStatusText(reg) }}</span>
+          </div>
+          <div class="card-body">
+            <div class="info-row">
+              <span class="label">🕐 Время:</span>
+              <span class="value">{{ reg.time }} - {{ reg.end_time }}</span>
+            </div>
+            <div class="info-row">
+              <span class="label">👥 Группа:</span>
+              <span class="value">{{ reg.group_name }}</span>
+            </div>
+            <div class="info-row">
+              <span class="label">🏋️ Тренер:</span>
+              <span class="value">{{ reg.coach_name }}</span>
+            </div>
+            <div *ngIf="reg.description" class="info-row">
+              <span class="label">📍 Место:</span>
+              <span class="value">{{ reg.description }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Past Trainings -->
+    <div *ngIf="registrations.past.length > 0" class="section">
+      <h2>📊 Прошедшие тренировки</h2>
+      <div class="registrations-list">
+        <div *ngFor="let reg of registrations.past" class="registration-card past">
+          <div class="card-header">
+            <h3>{{ formatDate(reg.date) }}</h3>
+            <span [class]="'status-badge ' + getStatusClass(reg)">{{ getStatusText(reg) }}</span>
+          </div>
+          <div class="card-body">
+            <div class="info-row">
+              <span class="label">🕐 Время:</span>
+              <span class="value">{{ reg.time }} - {{ reg.end_time }}</span>
+            </div>
+            <div class="info-row">
+              <span class="label">👥 Группа:</span>
+              <span class="value">{{ reg.group_name }}</span>
+            </div>
+            <div *ngIf="reg.notes" class="info-row">
+              <span class="label">📝 Заметки:</span>
+              <span class="value">{{ reg.notes }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Empty State -->
+    <div *ngIf="registrations.upcoming.length === 0 && registrations.past.length === 0" class="empty-state">
+      <p>📭 У вас нет записей на тренировки.</p>
+      <a routerLink="/calendar" class="btn-primary">Записаться на тренировку</a>
+    </div>
+  </div>
+</div>
