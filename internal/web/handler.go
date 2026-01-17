@@ -1,11 +1,13 @@
 package web
 
 import (
+	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -19,12 +21,13 @@ import (
 )
 
 type Handler struct {
-	scheduleService   service.TrainingScheduleService
-	coachService      service.CoachService
-	attendanceService service.AttendanceService
-	studentService    service.StudentService
-	userService       service.UserService
-	botToken          string // Для проверки Telegram WebApp initData
+	scheduleService    service.TrainingScheduleService
+	coachService       service.CoachService
+	attendanceService  service.AttendanceService
+	studentService     service.StudentService
+	userService        service.UserService
+	subscriptionService service.SubscriptionService
+	botToken           string // Для проверки Telegram WebApp initData
 }
 
 func NewHandler(
@@ -33,15 +36,17 @@ func NewHandler(
 	attendanceService service.AttendanceService,
 	studentService service.StudentService,
 	userService service.UserService,
+	subscriptionService service.SubscriptionService,
 	botToken string,
 ) *Handler {
 	return &Handler{
-		scheduleService:   scheduleService,
-		coachService:      coachService,
-		attendanceService: attendanceService,
-		studentService:    studentService,
-		userService:       userService,
-		botToken:          botToken,
+		scheduleService:    scheduleService,
+		coachService:       coachService,
+		attendanceService:  attendanceService,
+		studentService:     studentService,
+		userService:        userService,
+		subscriptionService: subscriptionService,
+		botToken:           botToken,
 	}
 }
 
@@ -748,6 +753,8 @@ func (h *Handler) TrainingDetailsAPI(w http.ResponseWriter, r *http.Request) {
 	// 2. Тренировка в будущем (дата и время начала)
 	// 3. Есть свободные места (если установлен лимит)
 	// 4. Пользователь не записан (если userID передан, иначе считаем что не записан)
+	// Примечание: проверка активного абонемента выполняется в RegisterForTraining,
+	// чтобы пользователь видел кнопку и получал сообщение об ошибке при попытке записи
 	if !isCoach && !isRegistered && trainingDateTime.After(now) {
 		if training.MaxParticipants != nil && *training.MaxParticipants > 0 {
 			maxParticipants := *training.MaxParticipants
@@ -871,6 +878,18 @@ func (h *Handler) RegisterForTraining(w http.ResponseWriter, r *http.Request) {
 	student, err := h.studentService.GetStudentByUserID(userID)
 	if err != nil {
 		http.Error(w, "Student not found: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Проверяем наличие активного абонемента с оставшимися занятиями
+	activeSubscription, err := h.subscriptionService.GetActiveSubscription(student.ID)
+	if err != nil || activeSubscription == nil {
+		http.Error(w, "Пополните абонемент. Для записи на тренировку необходим активный абонемент с оставшимися занятиями.", http.StatusBadRequest)
+		return
+	}
+
+	if activeSubscription.RemainingLessons <= 0 {
+		http.Error(w, "Пополните абонемент. Для записи на тренировку необходим активный абонемент с оставшимися занятиями.", http.StatusBadRequest)
 		return
 	}
 
@@ -1147,6 +1166,9 @@ func (h *Handler) MarkAttendanceAPI(w http.ResponseWriter, r *http.Request) {
 		}
 		markedCount++
 		log.Printf("[MarkAttendanceAPI] Посещаемость успешно отмечена для ученика %d", studentID)
+
+		// Отправляем уведомление студенту о списании занятия
+		h.sendLessonDeductionNotification(studentID, requestData.TrainingID)
 	}
 
 	// Формируем ответ с информацией об ошибках
@@ -1396,4 +1418,77 @@ func (h *Handler) getUserIDFromRequest(r *http.Request) (int64, error) {
 
 	log.Printf("[getUserIDFromRequest] Аутентификация не удалась: initData пустой и user_id не найден")
 	return 0, fmt.Errorf("user not authenticated")
+}
+
+// sendLessonDeductionNotification отправляет уведомление студенту о списании занятия
+func (h *Handler) sendLessonDeductionNotification(studentID int, trainingID int) {
+	// studentID - это ID из таблицы students
+	student, err := h.studentService.GetStudentByID(int64(studentID))
+	if err != nil {
+		log.Printf("[sendLessonDeductionNotification] Ошибка получения студента %d: %v", studentID, err)
+		return
+	}
+
+	// Получаем пользователя по userID студента
+	user, err := h.userService.GetByID(student.UserID)
+	if err != nil {
+		log.Printf("[sendLessonDeductionNotification] Ошибка получения пользователя для studentID %d: %v", studentID, err)
+		return
+	}
+
+	// Получаем информацию о тренировке
+	training, err := h.scheduleService.GetTrainingByID(trainingID)
+	if err != nil {
+		log.Printf("[sendLessonDeductionNotification] Ошибка получения тренировки %d: %v", trainingID, err)
+		return
+	}
+
+	// Получаем информацию об абонементе
+	subscription, err := h.subscriptionService.GetActiveSubscription(student.ID)
+	remainingLessons := 0
+	if err == nil && subscription != nil {
+		remainingLessons = subscription.RemainingLessons
+	}
+
+	// Формируем сообщение
+	msgText := fmt.Sprintf(
+		"✅ *Посещаемость отмечена!*\n\n"+
+			"📅 *Тренировка:* %s\n"+
+			"🕐 *Дата:* %s\n"+
+			"👥 *Группа:* %s\n\n"+
+			"🎫 *Осталось занятий:* %d",
+		training.StartTime.Format("15:04"),
+		training.TrainingDate.Format("02.01.2006"),
+		training.GroupName,
+		remainingLessons,
+	)
+
+	// Отправляем сообщение через Telegram Bot API
+	apiURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", h.botToken)
+	requestData := map[string]interface{}{
+		"chat_id":    user.TelegramID,
+		"text":       msgText,
+		"parse_mode": "Markdown",
+	}
+
+	requestJSON, err := json.Marshal(requestData)
+	if err != nil {
+		log.Printf("[sendLessonDeductionNotification] Ошибка маршалинга JSON: %v", err)
+		return
+	}
+
+	resp, err := http.Post(apiURL, "application/json", bytes.NewBuffer(requestJSON))
+	if err != nil {
+		log.Printf("[sendLessonDeductionNotification] Ошибка отправки уведомления: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		log.Printf("[sendLessonDeductionNotification] Ошибка Telegram API: %s", string(body))
+		return
+	}
+
+	log.Printf("[sendLessonDeductionNotification] Уведомление успешно отправлено студенту %d (telegramID: %d)", studentID, user.TelegramID)
 }

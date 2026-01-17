@@ -274,14 +274,34 @@ func (b *Bot) handleConfirmation(chatID int64, messageText string) {
 func (b *Bot) addSubscription(chatID int64, session *UserSession) {
 	// var err error
 	studentFromStudents, err := b.StudentService.GetStudentByUserID(session.SelectedStudentID)
+	if err != nil {
+		b.sendError(chatID, "❌ Ошибка при получении данных студента: "+err.Error())
+		b.resetSession(chatID)
+		return
+	}
 
+	// Получаем информацию о типе абонемента для уведомления
+	subscriptionNames := map[string]string{
+		"1":  "⛰️ Пробное занятие (1 занятие на 30 дней)",
+		"12": "💪 Абонемент на 12 занятий (Несгораемый)",
+		"16": "⛏️ Абонемент на 16 занятий (30 дней)",
+	}
+	subscriptionName := subscriptionNames[session.SelectedSubscriptionType]
+	if subscriptionName == "" {
+		subscriptionName = "Абонемент"
+	}
+
+	var totalLessons int
 	switch session.SelectedSubscriptionType {
 	case "1":
 		err = b.SubscriptionService.Create1For30Days(studentFromStudents.ID)
+		totalLessons = 1
 	case "12":
 		err = b.SubscriptionService.Create12Unlimited(studentFromStudents.ID)
+		totalLessons = 12
 	case "16":
 		err = b.SubscriptionService.Create16For30Days(studentFromStudents.ID)
+		totalLessons = 16
 	}
 
 	if err != nil {
@@ -290,6 +310,22 @@ func (b *Bot) addSubscription(chatID int64, session *UserSession) {
 	} else {
 		b.showMainKeyboardAfterOperation(chatID, "✅ Абонемент успешно добавлен!")
 		b.resetSession(chatID)
+
+		// Отправляем уведомление студенту
+		studentUser, err := b.UserService.GetByID(session.SelectedStudentID)
+		if err == nil && studentUser != nil {
+			msgText := fmt.Sprintf(
+				"🎫 *Вам зачислен абонемент!*\n\n"+
+					"📋 *Тип:* %s\n"+
+					"📊 *Количество занятий:* %d\n\n"+
+					"Теперь вы можете записываться на тренировки!",
+				subscriptionName,
+				totalLessons,
+			)
+			msg := tgbotapi.NewMessage(studentUser.TelegramID, msgText)
+			msg.ParseMode = "Markdown"
+			b.api.Send(msg)
+		}
 	}
 }
 

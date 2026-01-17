@@ -19,6 +19,7 @@ type UserService interface {
 
 type StudentService interface {
 	GetStudentByUserID(userID int64) (*models.Student, error)
+	GetStudentByID(studentID int64) (*models.Student, error)
 	UpdateAthleticTitle(studentID int64, athleticTitle string) error
 	GetStudentWithUser(studentID int64) (*models.Student, *models.User, error)
 }

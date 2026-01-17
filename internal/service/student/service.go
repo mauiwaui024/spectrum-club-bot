@@ -21,6 +21,10 @@ func (s *studentService) GetStudentByUserID(userID int64) (*models.Student, erro
 	return s.studentRepo.GetByUserID(userID)
 }
 
+func (s *studentService) GetStudentByID(studentID int64) (*models.Student, error) {
+	return s.studentRepo.GetByID(studentID)
+}
+
 func (s *studentService) UpdateAthleticTitle(studentID int64, athleticTitle string) error {
 	//TODO:IMPLEMENT
 	student := &models.Student{

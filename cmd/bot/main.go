@@ -73,6 +73,7 @@ func main() {
 		attendanceService,
 		studentService,
 		userService,
+		subscriptionService,
 		cfg.Bot.Token,
 	)
 
