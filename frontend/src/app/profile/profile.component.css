@@ -63,6 +63,11 @@
   border-bottom: 1px solid #e0e0e0;
 }
 
+.profile-name {
+  flex: 1;
+  min-width: 0;
+}
+
 .avatar {
   width: 64px;
   height: 64px;
@@ -186,16 +191,24 @@
   margin-left: auto;
 }
 
+.profile-actions {
+  flex-shrink: 0;
+}
+
 .edit-btn {
-  padding: 8px 16px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
   background: #1a73e8;
   color: white;
   border: none;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 500;
+  border-radius: 50%;
+  font-size: 16px;
   cursor: pointer;
   transition: background 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .edit-btn:hover {

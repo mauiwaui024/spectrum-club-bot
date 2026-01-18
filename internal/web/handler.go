@@ -1859,8 +1859,50 @@ func (h *Handler) UpdateProfileAPI(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Возвращаем обновленный профиль
-	h.MyProfileAPI(w, r)
+	// Получаем обновленного пользователя
+	updatedUser, err := h.userService.GetByID(userID)
+	if err != nil {
+		http.Error(w, "Error getting updated user: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Формируем ответ с обновленным профилем
+	response := map[string]interface{}{
+		"user": map[string]interface{}{
+			"id":            updatedUser.ID,
+			"first_name":    updatedUser.FirstName,
+			"last_name":     updatedUser.LastName,
+			"username":      updatedUser.Username,
+			"role":          updatedUser.Role,
+			"registered_at": updatedUser.RegisteredAt.Format("2006-01-02"),
+		},
+	}
+
+	// В зависимости от роли добавляем соответствующую информацию
+	if updatedUser.Role == "student" {
+		student, err := h.studentService.GetStudentByUserID(userID)
+		if err == nil && student != nil {
+			response["student"] = map[string]interface{}{
+				"id":             student.ID,
+				"athletic_title": student.AtleticTitle,
+				"created_at":     student.CreatedAt.Format("2006-01-02"),
+			}
+		}
+	} else if updatedUser.Role == "coach" {
+		coach, err := h.coachService.GetCoachByUserID(userID)
+		if err == nil && coach != nil {
+			response["coach"] = map[string]interface{}{
+				"id":          coach.ID,
+				"specialty":   coach.Specialty,
+				"experience":  coach.Experience,
+				"description": coach.Description,
+				"created_at":  coach.CreatedAt.Format("2006-01-02"),
+			}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }
 
 // AllStudentsSubscriptionsAPI возвращает все абонементы всех учеников (только для тренеров)
