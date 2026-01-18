@@ -25,6 +25,10 @@ export const routes: Routes = [
     loadComponent: () => import('./profile/profile.component').then(m => m.ProfileComponent)
   },
   {
+    path: 'students-subscriptions',
+    loadComponent: () => import('./students-subscriptions/students-subscriptions.component').then(m => m.StudentsSubscriptionsComponent)
+  },
+  {
     path: 'debug/initdata',
     loadComponent: () => import('./debug-initdata.component').then(m => m.DebugInitDataComponent)
   }

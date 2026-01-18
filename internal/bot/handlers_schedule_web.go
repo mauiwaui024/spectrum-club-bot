@@ -39,7 +39,7 @@ func (b *Bot) handleCalendarCommand(message *tgbotapi.Message) {
 		b.sendMessage(chatID, "Сначала зарегистрируйтесь в боте")
 		return
 	}
-
+	fmt.Println(userID)
 	// Формируем URL без user_id (будет использоваться initData из Telegram WebApp)
 	url := fmt.Sprintf("%s/calendar", b.webBaseURL)
 

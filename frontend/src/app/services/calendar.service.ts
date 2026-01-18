@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { CalendarAPIResponse, TrainingDetails } from '../models/training.model';
-import { MyRegistrationsResponse, MySubscriptionResponse, MyProfileResponse } from '../models/student.model';
+import { MyRegistrationsResponse, MySubscriptionResponse, MyProfileResponse, AllStudentsSubscriptionsResponse } from '../models/student.model';
 
 @Injectable({
   providedIn: 'root'
@@ -199,6 +199,13 @@ export class CalendarService {
   // Получить профиль ученика
   getMyProfile(): Observable<MyProfileResponse> {
     return this.http.get<MyProfileResponse>(`${this.apiUrl}/my-profile`, {
+      headers: this.getHeaders()
+    });
+  }
+
+  // Получить все абонементы всех учеников (для тренеров)
+  getAllStudentsSubscriptions(): Observable<AllStudentsSubscriptionsResponse> {
+    return this.http.get<AllStudentsSubscriptionsResponse>(`${this.apiUrl}/students-subscriptions`, {
       headers: this.getHeaders()
     });
   }

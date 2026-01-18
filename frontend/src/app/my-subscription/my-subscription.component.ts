@@ -28,13 +28,27 @@ export class MySubscriptionComponent implements OnInit {
     
     this.calendarService.getMySubscription().subscribe({
       next: (data) => {
+        console.log('Subscription data received:', data);
+        // Ensure arrays are initialized
+        if (!data.active) {
+          data.active = [];
+        }
+        if (!data.expired) {
+          data.expired = [];
+        }
         this.subscription = data;
+        console.log('Subscription after processing:', this.subscription);
+        console.log('Active subscriptions:', this.subscription.active?.length || 0);
+        console.log('Expired subscriptions:', this.subscription.expired?.length || 0);
         this.loading = false;
       },
       error: (err) => {
         this.error = 'Не удалось загрузить информацию об абонементе. Попробуйте позже.';
         this.loading = false;
         console.error('Error loading subscription:', err);
+        if (err.error) {
+          console.error('Error details:', err.error);
+        }
       }
     });
   }

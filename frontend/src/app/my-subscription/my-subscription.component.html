@@ -13,8 +13,13 @@
 
   <!-- Content -->
   <div *ngIf="!loading && !error && subscription">
+    <!-- Debug info (remove in production) -->
+    <!-- <div style="padding: 10px; background: #f0f0f0; margin: 10px 0;">
+      <p>Debug: has_active={{ subscription.has_active }}, active.length={{ subscription.active?.length || 0 }}, expired.length={{ subscription.expired?.length || 0 }}</p>
+    </div> -->
+    
     <!-- Active Subscriptions -->
-    <div *ngIf="subscription.active.length > 0" class="section">
+    <div *ngIf="subscription.active && subscription.active.length > 0" class="section">
       <h2>✅ Активные абонементы</h2>
       <div class="subscriptions-list">
         <div *ngFor="let sub of subscription.active" class="subscription-card active">
@@ -48,7 +53,7 @@
     </div>
 
     <!-- Expired Subscriptions -->
-    <div *ngIf="subscription.expired.length > 0" class="section">
+    <div *ngIf="subscription.expired && subscription.expired.length > 0" class="section">
       <h2>⏰ История абонементов</h2>
       <div class="subscriptions-list">
         <div *ngFor="let sub of subscription.expired" class="subscription-card expired">
@@ -78,7 +83,7 @@
     </div>
 
     <!-- Empty State -->
-    <div *ngIf="!subscription.has_active && subscription.expired.length === 0" class="empty-state">
+    <div *ngIf="(!subscription.has_active || !subscription.active || subscription.active.length === 0) && (!subscription.expired || subscription.expired.length === 0)" class="empty-state">
       <p>📭 У вас нет активных абонементов.</p>
       <p class="hint">Обратитесь к тренеру для приобретения абонемента.</p>
     </div>

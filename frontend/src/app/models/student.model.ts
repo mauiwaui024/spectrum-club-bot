@@ -51,5 +51,25 @@ export interface StudentProfile {
 
 export interface MyProfileResponse {
   user: UserProfile;
-  student: StudentProfile;
+  student?: StudentProfile;
+  coach?: CoachProfile;
+}
+
+export interface CoachProfile {
+  id: number;
+  specialty: string;
+  experience: string;
+  description: string;
+  created_at: string;
+}
+
+export interface StudentWithSubscriptions {
+  user_id: number;
+  student_id: number;
+  name: string;
+  subscriptions: Subscription[];
+}
+
+export interface AllStudentsSubscriptionsResponse {
+  students: StudentWithSubscriptions[];
 }

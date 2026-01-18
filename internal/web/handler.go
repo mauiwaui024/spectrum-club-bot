@@ -21,13 +21,13 @@ import (
 )
 
 type Handler struct {
-	scheduleService    service.TrainingScheduleService
-	coachService       service.CoachService
-	attendanceService  service.AttendanceService
-	studentService     service.StudentService
-	userService        service.UserService
+	scheduleService     service.TrainingScheduleService
+	coachService        service.CoachService
+	attendanceService   service.AttendanceService
+	studentService      service.StudentService
+	userService         service.UserService
 	subscriptionService service.SubscriptionService
-	botToken           string // Для проверки Telegram WebApp initData
+	botToken            string // Для проверки Telegram WebApp initData
 }
 
 func NewHandler(
@@ -40,13 +40,13 @@ func NewHandler(
 	botToken string,
 ) *Handler {
 	return &Handler{
-		scheduleService:    scheduleService,
-		coachService:       coachService,
-		attendanceService:  attendanceService,
-		studentService:     studentService,
-		userService:        userService,
+		scheduleService:     scheduleService,
+		coachService:        coachService,
+		attendanceService:   attendanceService,
+		studentService:      studentService,
+		userService:         userService,
 		subscriptionService: subscriptionService,
-		botToken:           botToken,
+		botToken:            botToken,
 	}
 }
 
@@ -1653,11 +1653,11 @@ func (h *Handler) MySubscriptionAPI(w http.ResponseWriter, r *http.Request) {
 		subData := map[string]interface{}{
 			"id":                subscription.ID,
 			"total_lessons":     subscription.TotalLessons,
-			"remaining_lessons":  subscription.RemainingLessons,
-			"used_lessons":       subscription.TotalLessons - subscription.RemainingLessons,
-			"start_date":         subscription.StartDate.Format("2006-01-02"),
-			"end_date":           subscription.EndDate.Format("2006-01-02"),
-			"created_at":         subscription.CreatedAt.Format("2006-01-02"),
+			"remaining_lessons": subscription.RemainingLessons,
+			"used_lessons":      subscription.TotalLessons - subscription.RemainingLessons,
+			"start_date":        subscription.StartDate.Format("2006-01-02"),
+			"end_date":          subscription.EndDate.Format("2006-01-02"),
+			"created_at":        subscription.CreatedAt.Format("2006-01-02"),
 		}
 
 		if subscription.RemainingLessons > 0 && subscription.EndDate.After(now) {
@@ -1673,8 +1673,8 @@ func (h *Handler) MySubscriptionAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response := map[string]interface{}{
-		"active":   activeSubscriptions,
-		"expired":  expiredSubscriptions,
+		"active":     activeSubscriptions,
+		"expired":    expiredSubscriptions,
 		"has_active": len(activeSubscriptions) > 0,
 	}
 
@@ -1682,7 +1682,7 @@ func (h *Handler) MySubscriptionAPI(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// MyProfileAPI возвращает профиль ученика
+// MyProfileAPI возвращает профиль пользователя (ученика или тренера)
 func (h *Handler) MyProfileAPI(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -1701,22 +1701,10 @@ func (h *Handler) MyProfileAPI(w http.ResponseWriter, r *http.Request) {
 		userID, _ = strconv.ParseInt(userIDStr, 10, 64)
 	}
 
-	// Проверяем роль пользователя - только студенты
+	// Получаем пользователя
 	user, err := h.userService.GetByID(userID)
 	if err != nil {
 		http.Error(w, "User not found: "+err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	if user.Role != "student" {
-		http.Error(w, "This endpoint is only for students", http.StatusForbidden)
-		return
-	}
-
-	// Получаем студента
-	student, err := h.studentService.GetStudentByUserID(userID)
-	if err != nil {
-		http.Error(w, "Student not found: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -1729,11 +1717,137 @@ func (h *Handler) MyProfileAPI(w http.ResponseWriter, r *http.Request) {
 			"role":          user.Role,
 			"registered_at": user.RegisteredAt.Format("2006-01-02"),
 		},
-		"student": map[string]interface{}{
+	}
+
+	// В зависимости от роли получаем соответствующую информацию
+	if user.Role == "student" {
+		// Получаем студента
+		student, err := h.studentService.GetStudentByUserID(userID)
+		if err != nil {
+			http.Error(w, "Student not found: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		response["student"] = map[string]interface{}{
 			"id":             student.ID,
 			"athletic_title": student.AtleticTitle,
-			"created_at":      student.CreatedAt.Format("2006-01-02"),
-		},
+			"created_at":     student.CreatedAt.Format("2006-01-02"),
+		}
+	} else if user.Role == "coach" {
+		// Получаем тренера
+		coach, err := h.coachService.GetCoachByUserID(userID)
+		if err != nil {
+			http.Error(w, "Coach not found: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		response["coach"] = map[string]interface{}{
+			"id":          coach.ID,
+			"specialty":   coach.Specialty,
+			"experience":  coach.Experience,
+			"description": coach.Description,
+			"created_at":  coach.CreatedAt.Format("2006-01-02"),
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// AllStudentsSubscriptionsAPI возвращает все абонементы всех учеников (только для тренеров)
+func (h *Handler) AllStudentsSubscriptionsAPI(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Получаем userID из initData или query параметра (fallback)
+	userID, err := h.getUserIDFromRequest(r)
+	if err != nil {
+		// Fallback: из query параметра (для обратной совместимости)
+		userIDStr := r.URL.Query().Get("user_id")
+		if userIDStr == "" {
+			http.Error(w, "Authentication required", http.StatusUnauthorized)
+			return
+		}
+		userID, _ = strconv.ParseInt(userIDStr, 10, 64)
+	}
+
+	// Проверяем, что пользователь - тренер
+	user, err := h.userService.GetByID(userID)
+	if err != nil {
+		http.Error(w, "User not found: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if user.Role != "coach" {
+		http.Error(w, "This endpoint is only for coaches", http.StatusForbidden)
+		return
+	}
+
+	// Получаем всех студентов
+	students, err := h.userService.GetAllStudents()
+	if err != nil {
+		http.Error(w, "Error getting students: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var studentsWithSubscriptions []map[string]interface{}
+	now := time.Now()
+
+	for _, studentUser := range students {
+		// Получаем студента по userID
+		student, err := h.studentService.GetStudentByUserID(studentUser.ID)
+		if err != nil {
+			// Пропускаем, если студент не найден
+			continue
+		}
+
+		// Получаем абонементы студента
+		subscriptions, err := h.subscriptionService.GetSubscriptionsByStudentID(student.ID)
+		if err != nil {
+			// Пропускаем, если не удалось получить абонементы
+			continue
+		}
+
+		// Формируем данные об абонементах
+		var subscriptionData []map[string]interface{}
+		for _, subscription := range subscriptions {
+			subData := map[string]interface{}{
+				"id":                subscription.ID,
+				"total_lessons":     subscription.TotalLessons,
+				"remaining_lessons": subscription.RemainingLessons,
+				"used_lessons":      subscription.TotalLessons - subscription.RemainingLessons,
+				"start_date":        subscription.StartDate.Format("2006-01-02"),
+				"end_date":          subscription.EndDate.Format("2006-01-02"),
+				"created_at":        subscription.CreatedAt.Format("2006-01-02"),
+			}
+
+			// Определяем статус
+			status := "active"
+			if subscription.RemainingLessons == 0 {
+				status = "used"
+			} else if subscription.EndDate.Before(now) {
+				status = "expired"
+			}
+			subData["status"] = status
+
+			subscriptionData = append(subscriptionData, subData)
+		}
+
+		// Добавляем студента с его абонементами
+		studentData := map[string]interface{}{
+			"user_id":       studentUser.ID,
+			"student_id":    student.ID,
+			"name":          studentUser.FirstName + " " + studentUser.LastName,
+			"subscriptions": subscriptionData,
+		}
+
+		studentsWithSubscriptions = append(studentsWithSubscriptions, studentData)
+	}
+
+	response := map[string]interface{}{
+		"students": studentsWithSubscriptions,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

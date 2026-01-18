@@ -52,4 +52,12 @@ export class ProfileComponent implements OnInit {
     const { first_name, last_name } = this.profile.user;
     return `${first_name} ${last_name}`.trim() || 'Не указано';
   }
+
+  isCoach(): boolean {
+    return this.profile?.user.role === 'coach';
+  }
+
+  isStudent(): boolean {
+    return this.profile?.user.role === 'student';
+  }
 }

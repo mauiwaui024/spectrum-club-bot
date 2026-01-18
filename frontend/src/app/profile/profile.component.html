@@ -20,7 +20,8 @@
         </div>
         <div class="profile-name">
           <h2>{{ getFullName() }}</h2>
-          <span class="role-badge">Ученик</span>
+          <span class="role-badge" *ngIf="isStudent()">Ученик</span>
+          <span class="role-badge" *ngIf="isCoach()">Тренер</span>
         </div>
       </div>
 
@@ -60,18 +61,47 @@
             </div>
           </div>
         </div>
+
+        <div class="section" *ngIf="profile.coach">
+          <h3>👨‍🏫 Информация о тренере</h3>
+          <div class="info-grid">
+            <div class="info-item" *ngIf="profile.coach.specialty">
+              <span class="label">Специализация:</span>
+              <span class="value">{{ profile.coach.specialty }}</span>
+            </div>
+            <div class="info-item" *ngIf="profile.coach.experience">
+              <span class="label">Опыт:</span>
+              <span class="value">{{ profile.coach.experience }}</span>
+            </div>
+            <div class="info-item" *ngIf="profile.coach.description">
+              <span class="label">Описание:</span>
+              <span class="value">{{ profile.coach.description }}</span>
+            </div>
+            <div class="info-item">
+              <span class="label">Дата создания профиля:</span>
+              <span class="value">{{ formatDate(profile.coach.created_at) }}</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
     <div class="quick-links">
-      <a routerLink="/my-registrations" class="quick-link">
+      <!-- For students -->
+      <a *ngIf="isStudent()" routerLink="/my-registrations" class="quick-link">
         <span class="icon">📅</span>
         <span class="text">Мои записи</span>
       </a>
-      <a routerLink="/my-subscription" class="quick-link">
+      <a *ngIf="isStudent()" routerLink="/my-subscription" class="quick-link">
         <span class="icon">🎫</span>
         <span class="text">Мой абонемент</span>
       </a>
+      <!-- For coaches -->
+      <a *ngIf="isCoach()" routerLink="/students-subscriptions" class="quick-link">
+        <span class="icon">🎫</span>
+        <span class="text">Абонементы учеников</span>
+      </a>
+      <!-- For both -->
       <a routerLink="/calendar" class="quick-link">
         <span class="icon">📆</span>
         <span class="text">Календарь</span>

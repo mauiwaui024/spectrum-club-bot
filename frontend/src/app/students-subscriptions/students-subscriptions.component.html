@@ -1,0 +1,116 @@
+<div class="container">
+  <!-- Header -->
+  <div class="header">
+    <h1>🎫 Абонементы учеников</h1>
+    <a routerLink="/calendar" class="back-link">← Назад к календарю</a>
+  </div>
+
+  <!-- Loading -->
+  <div *ngIf="loading" class="loading">Загрузка...</div>
+
+  <!-- Error -->
+  <div *ngIf="error" class="error">{{ error }}</div>
+
+  <!-- Content -->
+  <div *ngIf="!loading && !error && data">
+    <!-- Students List -->
+    <div *ngIf="data.students && data.students.length > 0" class="students-list">
+      <div *ngFor="let student of data.students" class="student-card">
+        <div class="student-header" (click)="toggleStudent(student.student_id)">
+          <div class="student-info">
+            <h3>{{ student.name }}</h3>
+            <span class="subscriptions-count">
+              {{ student.subscriptions.length }} {{ student.subscriptions.length === 1 ? 'абонемент' : 'абонементов' }}
+            </span>
+          </div>
+          <span class="expand-icon">{{ isExpanded(student.student_id) ? '▼' : '▶' }}</span>
+        </div>
+
+        <!-- Expanded Subscriptions -->
+        <div *ngIf="isExpanded(student.student_id)" class="subscriptions-container">
+          <!-- Active Subscriptions -->
+          <div *ngIf="getActiveSubscriptions(student).length > 0" class="subscriptions-section">
+            <h4>✅ Активные абонементы</h4>
+            <div class="subscriptions-list">
+              <div *ngFor="let sub of getActiveSubscriptions(student)" class="subscription-card active">
+                <div class="card-header">
+                  <h5>Абонемент #{{ sub.id }}</h5>
+                  <span class="status-badge status-active">Активен</span>
+                </div>
+                <div class="card-body">
+                  <div class="lessons-info">
+                    <div class="lessons-count">
+                      <span class="count-large">{{ sub.remaining_lessons }}</span>
+                      <span class="count-label">из {{ sub.total_lessons }} занятий</span>
+                    </div>
+                    <div class="progress-bar">
+                      <div class="progress-fill" [style.width.%]="getProgressPercentage(sub)"></div>
+                    </div>
+                  </div>
+                  <div class="info-grid">
+                    <div class="info-item">
+                      <span class="label">📅 Действует до:</span>
+                      <span class="value">{{ formatDate(sub.end_date) }}</span>
+                    </div>
+                    <div class="info-item">
+                      <span class="label">📅 Начало действия:</span>
+                      <span class="value">{{ formatDate(sub.start_date) }}</span>
+                    </div>
+                    <div class="info-item">
+                      <span class="label">📊 Использовано:</span>
+                      <span class="value">{{ sub.used_lessons }} из {{ sub.total_lessons }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Expired/Used Subscriptions -->
+          <div *ngIf="getExpiredSubscriptions(student).length > 0" class="subscriptions-section">
+            <h4>⏰ История абонементов</h4>
+            <div class="subscriptions-list">
+              <div *ngFor="let sub of getExpiredSubscriptions(student)" class="subscription-card expired">
+                <div class="card-header">
+                  <h5>Абонемент #{{ sub.id }}</h5>
+                  <span class="status-badge" [ngClass]="getStatusClass(sub)">{{ getStatusText(sub) }}</span>
+                </div>
+                <div class="card-body">
+                  <div class="lessons-info">
+                    <div class="lessons-count">
+                      <span class="count-large">{{ sub.remaining_lessons }}</span>
+                      <span class="count-label">из {{ sub.total_lessons }} занятий</span>
+                    </div>
+                    <div class="progress-bar">
+                      <div class="progress-fill" [style.width.%]="getProgressPercentage(sub)"></div>
+                    </div>
+                  </div>
+                  <div class="info-grid">
+                    <div class="info-item">
+                      <span class="label">📅 Период:</span>
+                      <span class="value">{{ formatDate(sub.start_date) }} - {{ formatDate(sub.end_date) }}</span>
+                    </div>
+                    <div class="info-item">
+                      <span class="label">📊 Использовано:</span>
+                      <span class="value">{{ sub.used_lessons }} из {{ sub.total_lessons }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- No Subscriptions -->
+          <div *ngIf="student.subscriptions.length === 0" class="empty-state">
+            <p>📭 У ученика нет абонементов.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Empty State -->
+    <div *ngIf="!data.students || data.students.length === 0" class="empty-state">
+      <p>📭 Нет учеников с абонементами.</p>
+    </div>
+  </div>
+</div>

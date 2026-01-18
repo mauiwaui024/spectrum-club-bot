@@ -29,6 +29,9 @@ export class CalendarComponent implements OnInit {
   loading: boolean = false;
   error: string | null = null;
   
+  // User role
+  isCoach: boolean = false;
+  
   // Modal state
   showModal: boolean = false;
   selectedTraining: TrainingDetails | null = null;
@@ -122,6 +125,7 @@ export class CalendarComponent implements OnInit {
     this.calendarService.getCalendar(userId, view, date).subscribe({
       next: (data) => {
         this.calendarData = data;
+        this.isCoach = data.is_coach || false;
         
         // Для недельного вида нужно установить viewDate на начало недели (понедельник)
         if (view === 'week' && data.start_date) {
