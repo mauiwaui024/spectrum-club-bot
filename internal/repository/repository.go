@@ -10,6 +10,7 @@ type UserRepository interface {
 	GetByTelegramID(telegramID int64) (*models.User, error)
 	GetByID(id int64) (*models.User, error)
 	UpdateRole(telegramID int64, role string) error
+	UpdateUser(userID int64, firstName, lastName *string) error
 
 	GetAllStudents() ([]*models.User, error)
 }
@@ -19,6 +20,7 @@ type StudentRepository interface {
 	GetByUserID(userID int64) (*models.Student, error)
 	GetByID(id int64) (*models.Student, error)
 	Update(student *models.Student) error
+	UpdateAthleticTitle(studentID int64, athleticTitle *string) error
 }
 
 type CoachRepository interface {
@@ -27,6 +29,7 @@ type CoachRepository interface {
 	GetByID(id int64) (*models.Coach, error)
 	GetAll() ([]*models.Coach, error)
 	Update(coach *models.Coach) error
+	UpdateProfile(coachID int64, specialty, experience, description *string) error
 
 	GetByCoachID(coachID int64) (*models.Coach, error)
 }

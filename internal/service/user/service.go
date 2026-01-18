@@ -133,3 +133,7 @@ func (s *userService) GetByID(id int64) (*models.User, error) {
 func (s *userService) GetByTelegramID(telegramID int64) (*models.User, error) {
 	return s.userRepo.GetByTelegramID(telegramID)
 }
+
+func (s *userService) UpdateProfile(userID int64, firstName, lastName *string) error {
+	return s.userRepo.UpdateUser(userID, firstName, lastName)
+}

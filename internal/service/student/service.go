@@ -25,13 +25,8 @@ func (s *studentService) GetStudentByID(studentID int64) (*models.Student, error
 	return s.studentRepo.GetByID(studentID)
 }
 
-func (s *studentService) UpdateAthleticTitle(studentID int64, athleticTitle string) error {
-	//TODO:IMPLEMENT
-	student := &models.Student{
-		ID:           studentID,
-		AtleticTitle: athleticTitle,
-	}
-	return s.studentRepo.Update(student)
+func (s *studentService) UpdateAthleticTitle(studentID int64, athleticTitle *string) error {
+	return s.studentRepo.UpdateAthleticTitle(studentID, athleticTitle)
 }
 
 func (s *studentService) GetStudentWithUser(studentID int64) (*models.Student, *models.User, error) {

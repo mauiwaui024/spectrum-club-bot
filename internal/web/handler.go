@@ -1754,6 +1754,115 @@ func (h *Handler) MyProfileAPI(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
+// UpdateProfileAPI обновляет профиль пользователя
+func (h *Handler) UpdateProfileAPI(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost && r.Method != http.MethodPut {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Получаем userID из initData или query параметра (fallback)
+	userID, err := h.getUserIDFromRequest(r)
+	if err != nil {
+		// Fallback: из query параметра (для обратной совместимости)
+		userIDStr := r.URL.Query().Get("user_id")
+		if userIDStr == "" {
+			http.Error(w, "Authentication required", http.StatusUnauthorized)
+			return
+		}
+		userID, _ = strconv.ParseInt(userIDStr, 10, 64)
+	}
+
+	// Получаем пользователя
+	user, err := h.userService.GetByID(userID)
+	if err != nil {
+		http.Error(w, "User not found: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Парсим JSON тело запроса
+	var requestData map[string]interface{}
+	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
+		http.Error(w, "Invalid JSON: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Подготавливаем данные для обновления пользователя
+	var firstName, lastName *string
+	if fn, ok := requestData["first_name"].(string); ok && fn != "" {
+		firstName = &fn
+	}
+	if ln, ok := requestData["last_name"].(string); ok && ln != "" {
+		lastName = &ln
+	}
+
+	// Обновляем данные пользователя (имя и фамилия)
+	if firstName != nil || lastName != nil {
+		if err := h.userService.UpdateProfile(userID, firstName, lastName); err != nil {
+			http.Error(w, "Error updating user: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// Обновляем данные в зависимости от роли
+	if user.Role == "student" {
+		// Получаем студента
+		student, err := h.studentService.GetStudentByUserID(userID)
+		if err != nil {
+			http.Error(w, "Student not found: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		// Обновляем athletic_title если передан
+		if at, ok := requestData["athletic_title"].(string); ok {
+			var athleticTitle *string
+			if at != "" {
+				athleticTitle = &at
+			}
+			if err := h.studentService.UpdateAthleticTitle(student.ID, athleticTitle); err != nil {
+				http.Error(w, "Error updating student: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
+	} else if user.Role == "coach" {
+		// Получаем тренера
+		coach, err := h.coachService.GetCoachByUserID(userID)
+		if err != nil {
+			http.Error(w, "Coach not found: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		// Подготавливаем данные для обновления тренера
+		var specialty, experience, description *string
+		if sp, ok := requestData["specialty"].(string); ok {
+			if sp != "" {
+				specialty = &sp
+			}
+		}
+		if exp, ok := requestData["experience"].(string); ok {
+			if exp != "" {
+				experience = &exp
+			}
+		}
+		if desc, ok := requestData["description"].(string); ok {
+			if desc != "" {
+				description = &desc
+			}
+		}
+
+		// Обновляем профиль тренера если переданы данные
+		if specialty != nil || experience != nil || description != nil {
+			if err := h.coachService.UpdateCoachProfile(coach.ID, specialty, experience, description); err != nil {
+				http.Error(w, "Error updating coach: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
+	}
+
+	// Возвращаем обновленный профиль
+	h.MyProfileAPI(w, r)
+}
+
 // AllStudentsSubscriptionsAPI возвращает все абонементы всех учеников (только для тренеров)
 func (h *Handler) AllStudentsSubscriptionsAPI(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {

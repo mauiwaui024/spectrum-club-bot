@@ -23,64 +23,138 @@
           <span class="role-badge" *ngIf="isStudent()">Ученик</span>
           <span class="role-badge" *ngIf="isCoach()">Тренер</span>
         </div>
+        <div class="profile-actions" *ngIf="!isEditing">
+          <button class="edit-btn" (click)="startEdit()">✏️ Редактировать</button>
+        </div>
       </div>
 
       <div class="profile-body">
-        <div class="section">
-          <h3>👤 Информация о пользователе</h3>
-          <div class="info-grid">
-            <div class="info-item">
-              <span class="label">Имя:</span>
-              <span class="value">{{ profile.user.first_name || 'Не указано' }}</span>
+        <!-- Read-only view -->
+        <div *ngIf="!isEditing">
+          <div class="section">
+            <h3>👤 Информация о пользователе</h3>
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="label">Имя:</span>
+                <span class="value">{{ profile.user.first_name || 'Не указано' }}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Фамилия:</span>
+                <span class="value">{{ profile.user.last_name || 'Не указано' }}</span>
+              </div>
+              <div class="info-item" *ngIf="profile.user.username">
+                <span class="label">Username:</span>
+                <span class="value">{{ '@' + profile.user.username }}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Дата регистрации:</span>
+                <span class="value">{{ formatDate(profile.user.registered_at) }}</span>
+              </div>
             </div>
-            <div class="info-item">
-              <span class="label">Фамилия:</span>
-              <span class="value">{{ profile.user.last_name || 'Не указано' }}</span>
+          </div>
+
+          <div class="section" *ngIf="profile.student">
+            <h3>🎓 Информация о студенте</h3>
+            <div class="info-grid">
+              <div class="info-item" *ngIf="profile.student.athletic_title">
+                <span class="label">Спортивный разряд:</span>
+                <span class="value">{{ profile.student.athletic_title }}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Дата создания профиля:</span>
+                <span class="value">{{ formatDate(profile.student.created_at) }}</span>
+              </div>
             </div>
-            <div class="info-item" *ngIf="profile.user.username">
-              <span class="label">Username:</span>
-              <span class="value">{{ '@' + profile.user.username }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">Дата регистрации:</span>
-              <span class="value">{{ formatDate(profile.user.registered_at) }}</span>
+          </div>
+
+          <div class="section" *ngIf="profile.coach">
+            <h3>👨‍🏫 Информация о тренере</h3>
+            <div class="info-grid">
+              <div class="info-item" *ngIf="profile.coach.specialty">
+                <span class="label">Специализация:</span>
+                <span class="value">{{ profile.coach.specialty }}</span>
+              </div>
+              <div class="info-item" *ngIf="profile.coach.experience">
+                <span class="label">Опыт:</span>
+                <span class="value">{{ profile.coach.experience }}</span>
+              </div>
+              <div class="info-item" *ngIf="profile.coach.description">
+                <span class="label">Описание:</span>
+                <span class="value">{{ profile.coach.description }}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Дата создания профиля:</span>
+                <span class="value">{{ formatDate(profile.coach.created_at) }}</span>
+              </div>
             </div>
           </div>
         </div>
 
-        <div class="section" *ngIf="profile.student">
-          <h3>🎓 Информация о студенте</h3>
-          <div class="info-grid">
-            <div class="info-item" *ngIf="profile.student.athletic_title">
-              <span class="label">Спортивный разряд:</span>
-              <span class="value">{{ profile.student.athletic_title }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">Дата создания профиля:</span>
-              <span class="value">{{ formatDate(profile.student.created_at) }}</span>
+        <!-- Edit form -->
+        <div *ngIf="isEditing" class="edit-form">
+          <div class="section">
+            <h3>👤 Информация о пользователе</h3>
+            <div class="form-grid">
+              <div class="form-item">
+                <label>Имя:</label>
+                <input type="text" [(ngModel)]="editFirstName" placeholder="Введите имя" class="form-input">
+              </div>
+              <div class="form-item">
+                <label>Фамилия:</label>
+                <input type="text" [(ngModel)]="editLastName" placeholder="Введите фамилию" class="form-input">
+              </div>
+              <div class="info-item" *ngIf="profile.user.username">
+                <span class="label">Username:</span>
+                <span class="value">{{ '@' + profile.user.username }}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Дата регистрации:</span>
+                <span class="value">{{ formatDate(profile.user.registered_at) }}</span>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div class="section" *ngIf="profile.coach">
-          <h3>👨‍🏫 Информация о тренере</h3>
-          <div class="info-grid">
-            <div class="info-item" *ngIf="profile.coach.specialty">
-              <span class="label">Специализация:</span>
-              <span class="value">{{ profile.coach.specialty }}</span>
+          <div class="section" *ngIf="isStudent()">
+            <h3>🎓 Информация о студенте</h3>
+            <div class="form-grid">
+              <div class="form-item">
+                <label>Спортивный разряд:</label>
+                <input type="text" [(ngModel)]="editAthleticTitle" placeholder="Введите спортивный разряд" class="form-input">
+              </div>
+              <div class="info-item">
+                <span class="label">Дата создания профиля:</span>
+                <span class="value">{{ formatDate(profile.student?.created_at || '') }}</span>
+              </div>
             </div>
-            <div class="info-item" *ngIf="profile.coach.experience">
-              <span class="label">Опыт:</span>
-              <span class="value">{{ profile.coach.experience }}</span>
+          </div>
+
+          <div class="section" *ngIf="isCoach()">
+            <h3>👨‍🏫 Информация о тренере</h3>
+            <div class="form-grid">
+              <div class="form-item">
+                <label>Специализация:</label>
+                <input type="text" [(ngModel)]="editSpecialty" placeholder="Введите специализацию" class="form-input">
+              </div>
+              <div class="form-item">
+                <label>Опыт:</label>
+                <input type="text" [(ngModel)]="editExperience" placeholder="Введите опыт" class="form-input">
+              </div>
+              <div class="form-item">
+                <label>Описание:</label>
+                <textarea [(ngModel)]="editDescription" placeholder="Введите описание" class="form-textarea" rows="4"></textarea>
+              </div>
+              <div class="info-item">
+                <span class="label">Дата создания профиля:</span>
+                <span class="value">{{ formatDate(profile.coach?.created_at || '') }}</span>
+              </div>
             </div>
-            <div class="info-item" *ngIf="profile.coach.description">
-              <span class="label">Описание:</span>
-              <span class="value">{{ profile.coach.description }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">Дата создания профиля:</span>
-              <span class="value">{{ formatDate(profile.coach.created_at) }}</span>
-            </div>
+          </div>
+
+          <div class="form-actions">
+            <button class="btn btn-primary" (click)="saveProfile()" [disabled]="saving">
+              {{ saving ? 'Сохранение...' : '💾 Сохранить' }}
+            </button>
+            <button class="btn btn-secondary" (click)="cancelEdit()" [disabled]="saving">❌ Отмена</button>
           </div>
         </div>
       </div>

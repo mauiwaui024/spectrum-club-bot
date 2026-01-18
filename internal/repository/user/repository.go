@@ -59,6 +59,19 @@ func (r *userRepository) UpdateRole(telegramID int64, role string) error {
 	return err
 }
 
+func (r *userRepository) UpdateUser(userID int64, firstName, lastName *string) error {
+	query := `
+		UPDATE spectrum.users 
+		SET 
+			first_name = COALESCE($1, first_name),
+			last_name = COALESCE($2, last_name),
+			updated_at = CURRENT_TIMESTAMP
+		WHERE id = $3
+	`
+	_, err := r.db.Exec(query, firstName, lastName, userID)
+	return err
+}
+
 func (r *userRepository) GetAllStudents() ([]*models.User, error) {
 	var users []*models.User
 	query := `SELECT * FROM spectrum.users WHERE role = 'student' ORDER BY first_name, last_name`

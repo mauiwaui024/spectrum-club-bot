@@ -65,3 +65,15 @@ func (r *studentRepository) Update(student *models.Student) error {
 	)
 	return err
 }
+
+func (r *studentRepository) UpdateAthleticTitle(studentID int64, athleticTitle *string) error {
+	query := `
+		UPDATE spectrum.students 
+		SET 
+			athletic_title = COALESCE($1, athletic_title),
+			updated_at = CURRENT_TIMESTAMP
+		WHERE id = $2
+	`
+	_, err := r.db.Exec(query, athleticTitle, studentID)
+	return err
+}

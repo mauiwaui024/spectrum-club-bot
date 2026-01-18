@@ -63,6 +63,20 @@ func (r *coachRepository) Update(coach *models.Coach) error {
 	return err
 }
 
+func (r *coachRepository) UpdateProfile(coachID int64, specialty, experience, description *string) error {
+	query := `
+		UPDATE spectrum.coaches 
+		SET 
+			specialty = COALESCE($1, specialty),
+			experience = COALESCE($2, experience),
+			description = COALESCE($3, description),
+			updated_at = CURRENT_TIMESTAMP
+		WHERE id = $4
+	`
+	_, err := r.db.Exec(query, specialty, experience, description, coachID)
+	return err
+}
+
 func (r *coachRepository) GetAll() ([]*models.Coach, error) {
 	var coaches []*models.Coach
 	query := `SELECT * FROM spectrum.coaches ORDER BY created_at DESC`

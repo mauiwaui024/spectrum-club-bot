@@ -10,6 +10,7 @@ type UserService interface {
 	GetUserProfile(telegramID int64) (*models.User, *models.Student, *models.Subscription, *models.Coach, error)
 	SetRole(telegramID int64, role string) error
 	RegisterAsCoach(telegramID int64, specialty, experience, description string) error
+	UpdateProfile(userID int64, firstName, lastName *string) error
 
 	GetAllStudents() ([]*models.User, error)
 	GetByID(id int64) (*models.User, error)
@@ -20,14 +21,14 @@ type UserService interface {
 type StudentService interface {
 	GetStudentByUserID(userID int64) (*models.Student, error)
 	GetStudentByID(studentID int64) (*models.Student, error)
-	UpdateAthleticTitle(studentID int64, athleticTitle string) error
+	UpdateAthleticTitle(studentID int64, athleticTitle *string) error
 	GetStudentWithUser(studentID int64) (*models.Student, *models.User, error)
 }
 
 type CoachService interface {
 	RegisterCoach(userID int64, specialty, experience, description string) error
 	GetCoachByUserID(userID int64) (*models.Coach, error)
-	UpdateCoachProfile(coachID int64, specialty, experience, description string) error
+	UpdateCoachProfile(coachID int64, specialty, experience, description *string) error
 	// GetAllCoaches() ([]*models.Coach, error)
 	GetByCoachID(coachID int64) (*models.Coach, error)
 }

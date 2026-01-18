@@ -33,15 +33,8 @@ func (s *coachService) GetCoachByUserID(userID int64) (*models.Coach, error) {
 	return s.coachRepo.GetByUserID(userID)
 }
 
-func (s *coachService) UpdateCoachProfile(coachID int64, specialty, experience, description string) error {
-	coach := &models.Coach{
-		ID:          coachID,
-		Specialty:   specialty,
-		Experience:  experience,
-		Description: description,
-		UpdatedAt:   time.Now(),
-	}
-	return s.coachRepo.Update(coach)
+func (s *coachService) UpdateCoachProfile(coachID int64, specialty, experience, description *string) error {
+	return s.coachRepo.UpdateProfile(coachID, specialty, experience, description)
 }
 
 // func (s *coachService) GetAllCoaches() ([]*models.Coach, error) {

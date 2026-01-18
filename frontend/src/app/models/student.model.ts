@@ -73,3 +73,12 @@ export interface StudentWithSubscriptions {
 export interface AllStudentsSubscriptionsResponse {
   students: StudentWithSubscriptions[];
 }
+
+export interface UpdateProfileRequest {
+  first_name?: string;
+  last_name?: string;
+  athletic_title?: string; // for students
+  specialty?: string; // for coaches
+  experience?: string; // for coaches
+  description?: string; // for coaches
+}
