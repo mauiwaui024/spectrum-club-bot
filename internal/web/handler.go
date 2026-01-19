@@ -1975,11 +1975,15 @@ func (h *Handler) AllStudentsSubscriptionsAPI(w http.ResponseWriter, r *http.Req
 			}
 
 			// Определяем статус
-			status := "active"
+			// Активен только если remaining_lessons > 0 AND end_date > now
+			var status string
 			if subscription.RemainingLessons == 0 {
 				status = "used"
-			} else if subscription.EndDate.Before(now) {
+			} else if subscription.EndDate.Before(now) || subscription.EndDate.Equal(now) {
 				status = "expired"
+			} else {
+				// remaining_lessons > 0 AND end_date > now
+				status = "active"
 			}
 			subData["status"] = status
 
@@ -1994,16 +1998,18 @@ func (h *Handler) AllStudentsSubscriptionsAPI(w http.ResponseWriter, r *http.Req
 			}
 		}
 
-		// Добавляем студента с его абонементами
-		studentData := map[string]interface{}{
-			"user_id":             studentUser.ID,
-			"student_id":          student.ID,
-			"name":                studentUser.FirstName + " " + studentUser.LastName,
-			"subscriptions":       subscriptionData,
-			"total_lessons_count": totalLessonsCount,
-		}
+		// Добавляем студента в список только если у него есть активные абонементы
+		if totalLessonsCount > 0 {
+			studentData := map[string]interface{}{
+				"user_id":             studentUser.ID,
+				"student_id":          student.ID,
+				"name":                studentUser.FirstName + " " + studentUser.LastName,
+				"subscriptions":       subscriptionData,
+				"total_lessons_count": totalLessonsCount,
+			}
 
-		studentsWithSubscriptions = append(studentsWithSubscriptions, studentData)
+			studentsWithSubscriptions = append(studentsWithSubscriptions, studentData)
+		}
 	}
 
 	response := map[string]interface{}{
