@@ -1,6 +1,7 @@
 package subscription_service
 
 import (
+	"fmt"
 	"spectrum-club-bot/internal/models"
 	"spectrum-club-bot/internal/repository"
 	"spectrum-club-bot/internal/service"
@@ -136,6 +137,18 @@ func (s *subscriptionService) DecrementRemainingLessons(studentID int64) error {
 
 // AddLessons добавляет занятия к абонементу
 func (s *subscriptionService) AddLessons(subscriptionID int64, count int) error {
+	subscription, err := s.subscriptionRepo.GetByID(subscriptionID)
+	if err != nil {
+		return err
+	}
+	if subscription == nil {
+		return fmt.Errorf("абонемент с ID %d не найден", subscriptionID)
+	}
+	possibleToAdd := subscription.TotalLessons - subscription.RemainingLessons
+	if count > possibleToAdd {
+		return fmt.Errorf("возможно добавить только %d", possibleToAdd)
+	}
+
 	return s.subscriptionRepo.AddLessons(subscriptionID, count)
 }
 

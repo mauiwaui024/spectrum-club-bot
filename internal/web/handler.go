@@ -1996,10 +1996,10 @@ func (h *Handler) AllStudentsSubscriptionsAPI(w http.ResponseWriter, r *http.Req
 
 		// Добавляем студента с его абонементами
 		studentData := map[string]interface{}{
-			"user_id":            studentUser.ID,
-			"student_id":         student.ID,
-			"name":               studentUser.FirstName + " " + studentUser.LastName,
-			"subscriptions":      subscriptionData,
+			"user_id":             studentUser.ID,
+			"student_id":          student.ID,
+			"name":                studentUser.FirstName + " " + studentUser.LastName,
+			"subscriptions":       subscriptionData,
 			"total_lessons_count": totalLessonsCount,
 		}
 

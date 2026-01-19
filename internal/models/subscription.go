@@ -10,6 +10,7 @@ type Subscription struct {
 	TotalLessons     int       `db:"total_lessons" json:"total_lessons"`
 	RemainingLessons int       `db:"remaining_lessons" json:"remaining_lessons"`
 	CreatedAt        time.Time `db:"created_at" json:"created_at"`
+	UpdatedAt        time.Time `db:"updated_at" json:"updated_at"`
 }
 
 // CREATE TABLE spectrum.subscriptions (
