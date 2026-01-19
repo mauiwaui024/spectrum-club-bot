@@ -26,6 +26,9 @@
               <span class="lessons-count" *ngIf="getTotalLessonsCount(student) > 0">
                 • {{ getTotalLessonsCount(student) }} занятий
               </span>
+              <span class="subscription-types" *ngIf="getActiveSubscriptionsTypes(student)">
+                • {{ getActiveSubscriptionsTypes(student) }}
+              </span>
             </div>
           </div>
           <span class="expand-icon">{{ isExpanded(student.student_id) ? '▼' : '▶' }}</span>
@@ -56,6 +59,10 @@
                     </div>
                   </div>
                   <div class="info-grid">
+                    <div class="info-item">
+                      <span class="label">🎫 Тип абонемента:</span>
+                      <span class="value">{{ getSubscriptionTypeName(sub) }}</span>
+                    </div>
                     <div class="info-item">
                       <span class="label">📅 Действует до:</span>
                       <span class="value">{{ formatDate(sub.end_date) }}</span>

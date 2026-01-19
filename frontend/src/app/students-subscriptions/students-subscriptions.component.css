@@ -98,6 +98,12 @@
   font-weight: 500;
 }
 
+.subscription-types {
+  font-size: 14px;
+  color: #5f6368;
+  font-style: italic;
+}
+
 .expand-icon {
   font-size: 14px;
   color: #5f6368;

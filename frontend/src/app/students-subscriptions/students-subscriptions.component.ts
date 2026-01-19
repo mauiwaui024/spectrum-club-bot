@@ -96,6 +96,17 @@ export class StudentsSubscriptionsComponent implements OnInit {
     return student.subscriptions.filter(sub => sub.status === 'active');
   }
 
+  getActiveSubscriptionsTypes(student: StudentWithSubscriptions): string {
+    const activeSubs = this.getActiveSubscriptions(student);
+    if (activeSubs.length === 0) {
+      return '';
+    }
+    // Получаем уникальные типы абонементов
+    const types = activeSubs.map(sub => this.getSubscriptionTypeName(sub));
+    const uniqueTypes = [...new Set(types)];
+    return uniqueTypes.join(', ');
+  }
+
   getExpiredSubscriptions(student: StudentWithSubscriptions): Subscription[] {
     return student.subscriptions.filter(sub => sub.status !== 'active');
   }
@@ -110,28 +121,68 @@ export class StudentsSubscriptionsComponent implements OnInit {
 
   getMaxAddableLessons(sub: Subscription): number {
     // Определяем максимальный лимит для типа абонемента
+    // Определяем тип по точным значениям или ближайшему нижнему
     let maxTypeLimit: number;
-    if (sub.total_lessons <= 1) {
+    if (sub.total_lessons === 1) {
       maxTypeLimit = 1;
-    } else if (sub.total_lessons <= 12) {
+    } else if (sub.total_lessons === 12) {
+      maxTypeLimit = 12;
+    } else if (sub.total_lessons === 16) {
+      maxTypeLimit = 16;
+    } else if (sub.total_lessons < 12) {
+      // Между 1 и 12, предполагаем тип 12
       maxTypeLimit = 12;
     } else {
+      // >= 13 или > 16, предполагаем тип 16
       maxTypeLimit = 16;
     }
 
     // Максимум, который можно добавить до исходного количества (использованные занятия)
     const maxToOriginal = sub.total_lessons - sub.remaining_lessons;
 
-    // Если уже достигнут или превышен лимит типа, можно только вернуть использованные занятия
-    if (sub.total_lessons >= maxTypeLimit) {
+    // Если total_lessons превышает лимит типа, можно добавить только до лимита типа
+    if (sub.total_lessons > maxTypeLimit) {
+      // Максимум до лимита типа по total_lessons
+      const maxTotalAtLimit = maxTypeLimit;
+      const currentTotal = sub.total_lessons;
+      const possibleToAddToTotalLimit = maxTotalAtLimit - currentTotal;
+      
+      // Максимум до лимита типа по remaining_lessons
+      const maxRemainingAtLimit = maxTypeLimit;
+      const currentRemaining = sub.remaining_lessons;
+      const possibleToAddToRemainingLimit = maxRemainingAtLimit - currentRemaining;
+      
+      // Берем минимум из всех ограничений
+      let possibleToAdd = maxToOriginal;
+      if (possibleToAddToTotalLimit < possibleToAdd) {
+        possibleToAdd = possibleToAddToTotalLimit;
+      }
+      if (possibleToAddToRemainingLimit < possibleToAdd && possibleToAddToRemainingLimit >= 0) {
+        possibleToAdd = possibleToAddToRemainingLimit;
+      }
+      return Math.max(0, possibleToAdd);
+    } else if (sub.total_lessons === maxTypeLimit) {
+      // Точно на лимите типа, можно только вернуть использованные занятия
       return maxToOriginal;
+    } else {
+      // Ниже лимита типа, проверяем оба ограничения
+      const maxToTypeLimit = maxTypeLimit - sub.total_lessons;
+      return Math.min(maxToTypeLimit, maxToOriginal);
     }
+  }
 
-    // Максимум, который можно добавить до лимита типа
-    const maxToTypeLimit = maxTypeLimit - sub.total_lessons;
-    
-    // Возвращаем минимум из двух ограничений
-    return Math.min(maxToTypeLimit, maxToOriginal);
+  getSubscriptionTypeName(sub: Subscription): string {
+    if (sub.total_lessons === 1) {
+      return '1 занятие';
+    } else if (sub.total_lessons === 12) {
+      return '12 занятий - несгораемый';
+    } else if (sub.total_lessons === 16) {
+      return '16 занятий - 30 дней';
+    } else if (sub.total_lessons < 12) {
+      return '12 занятий - несгораемый';
+    } else {
+      return '16 занятий - 30 дней';
+    }
   }
 
   startEdit(subscription: Subscription) {
