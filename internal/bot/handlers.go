@@ -370,7 +370,8 @@ func (b *Bot) showAllStudens(chatID int64, user *models.User) {
 	// Получаем все абонементы
 	allSubscriptions, err := b.SubscriptionService.GetAll()
 	if err != nil {
-		msg := tgbotapi.NewMessage(chatID, "❌ Ошибка при получении абонементов")
+		errStr := err.Error()
+		msg := tgbotapi.NewMessage(chatID, errStr)
 		b.api.Send(msg)
 		return
 	}
