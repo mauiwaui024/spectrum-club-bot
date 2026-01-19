@@ -393,3 +393,14 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+.form-hint {
+  font-size: 12px;
+  color: #5f6368;
+  margin-top: 4px;
+  padding-left: 2px;
+}
+
+.form-hint-warning {
+  color: #d32f2f;
+}

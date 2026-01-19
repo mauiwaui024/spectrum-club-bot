@@ -107,6 +107,27 @@ export class StudentsSubscriptionsComponent implements OnInit {
     return this.getActiveSubscriptions(student).reduce((sum, sub) => sum + sub.remaining_lessons, 0);
   }
 
+  getMaxAddableLessons(sub: Subscription): number {
+    // Определяем максимальный лимит для типа абонемента
+    let maxTypeLimit: number;
+    if (sub.total_lessons <= 1) {
+      maxTypeLimit = 1;
+    } else if (sub.total_lessons <= 12) {
+      maxTypeLimit = 12;
+    } else {
+      maxTypeLimit = 16;
+    }
+
+    // Максимум, который можно добавить до лимита типа
+    const maxToTypeLimit = maxTypeLimit - sub.total_lessons;
+    
+    // Максимум, который можно добавить до исходного количества (использованные занятия)
+    const maxToOriginal = sub.total_lessons - sub.remaining_lessons;
+
+    // Возвращаем минимум из двух ограничений
+    return Math.min(maxToTypeLimit > 0 ? maxToTypeLimit : 0, maxToOriginal);
+  }
+
   startEdit(subscription: Subscription) {
     this.editingSubscriptionId = subscription.id;
     this.addLessonsCount = 1;
@@ -128,6 +149,22 @@ export class StudentsSubscriptionsComponent implements OnInit {
   addLessons(subscription: Subscription) {
     if (this.addLessonsCount <= 0) {
       this.error = 'Количество занятий должно быть больше 0';
+      return;
+    }
+
+    // Валидация: проверяем максимальное количество, которое можно добавить
+    const maxToAdd = this.getMaxAddableLessons(subscription);
+    if (this.addLessonsCount > maxToAdd) {
+      // Определяем лимит типа для сообщения об ошибке
+      let maxTypeLimit: number;
+      if (subscription.total_lessons <= 1) {
+        maxTypeLimit = 1;
+      } else if (subscription.total_lessons <= 12) {
+        maxTypeLimit = 12;
+      } else {
+        maxTypeLimit = 16;
+      }
+      this.error = `Можно добавить максимум ${maxToAdd} занятий (до исходного лимита абонемента ${maxTypeLimit} занятий)`;
       return;
     }
 
@@ -170,6 +207,12 @@ export class StudentsSubscriptionsComponent implements OnInit {
   removeLessons(subscription: Subscription) {
     if (this.removeLessonsCount <= 0) {
       this.error = 'Количество занятий должно быть больше 0';
+      return;
+    }
+
+    // Валидация: проверяем, что достаточно занятий для снятия
+    if (this.removeLessonsCount > subscription.remaining_lessons) {
+      this.error = `Недостаточно занятий. Доступно: ${subscription.remaining_lessons}`;
       return;
     }
 

@@ -144,9 +144,32 @@ func (s *subscriptionService) AddLessons(subscriptionID int64, count int) error 
 	if subscription == nil {
 		return fmt.Errorf("абонемент с ID %d не найден", subscriptionID)
 	}
+
+	// Определяем максимальный лимит для типа абонемента
+	// Типы: 1 (пробное), 12 (несгораемый), 16 (30 дней)
+	var maxTypeLimit int
+	if subscription.TotalLessons <= 1 {
+		maxTypeLimit = 1
+	} else if subscription.TotalLessons <= 12 {
+		maxTypeLimit = 12
+	} else {
+		maxTypeLimit = 16
+	}
+
+	// Проверяем, что после добавления не превысим лимит типа
+	newTotalLessons := subscription.TotalLessons + count
+	if newTotalLessons > maxTypeLimit {
+		possibleToAdd := maxTypeLimit - subscription.TotalLessons
+		if possibleToAdd < 0 {
+			possibleToAdd = 0
+		}
+		return fmt.Errorf("можно добавить максимум %d занятий (до исходного лимита абонемента %d занятий)", possibleToAdd, maxTypeLimit)
+	}
+
+	// Проверяем, что не добавляем больше, чем было использовано
 	possibleToAdd := subscription.TotalLessons - subscription.RemainingLessons
 	if count > possibleToAdd {
-		return fmt.Errorf("возможно добавить только %d", possibleToAdd)
+		return fmt.Errorf("можно добавить максимум %d занятий (до исходного лимита абонемента %d занятий)", possibleToAdd, maxTypeLimit)
 	}
 
 	return s.subscriptionRepo.AddLessons(subscriptionID, count)
@@ -154,5 +177,18 @@ func (s *subscriptionService) AddLessons(subscriptionID int64, count int) error 
 
 // RemoveLessons снимает занятия с абонемента
 func (s *subscriptionService) RemoveLessons(subscriptionID int64, count int) error {
+	subscription, err := s.subscriptionRepo.GetByID(subscriptionID)
+	if err != nil {
+		return err
+	}
+	if subscription == nil {
+		return fmt.Errorf("абонемент с ID %d не найден", subscriptionID)
+	}
+
+	// Проверяем, что достаточно занятий для снятия
+	if count > subscription.RemainingLessons {
+		return fmt.Errorf("недостаточно занятий для снятия. Доступно: %d", subscription.RemainingLessons)
+	}
+
 	return s.subscriptionRepo.RemoveLessons(subscriptionID, count)
 }

@@ -77,11 +77,17 @@
                   <div class="form-group">
                     <label>Добавить занятия:</label>
                     <div class="input-group">
-                      <input type="number" [(ngModel)]="addLessonsCount" min="1" class="form-input" placeholder="Количество">
+                      <input type="number" [(ngModel)]="addLessonsCount" min="1" [max]="getMaxAddableLessons(sub)" class="form-input" placeholder="Количество">
                       <button class="btn btn-primary" (click)="addLessons(sub)" [disabled]="saving">
                         <span *ngIf="!saving">Добавить</span>
                         <span *ngIf="saving">Сохранение...</span>
                       </button>
+                    </div>
+                    <div class="form-hint" *ngIf="getMaxAddableLessons(sub) > 0">
+                      Максимум: {{ getMaxAddableLessons(sub) }} занятий
+                    </div>
+                    <div class="form-hint form-hint-warning" *ngIf="getMaxAddableLessons(sub) === 0">
+                      Нельзя добавить больше занятий (достигнут лимит абонемента)
                     </div>
                   </div>
                   <div class="form-group">
@@ -92,6 +98,12 @@
                         <span *ngIf="!saving">Снять</span>
                         <span *ngIf="saving">Сохранение...</span>
                       </button>
+                    </div>
+                    <div class="form-hint" *ngIf="sub.remaining_lessons > 0">
+                      Доступно: {{ sub.remaining_lessons }} занятий
+                    </div>
+                    <div class="form-hint form-hint-warning" *ngIf="sub.remaining_lessons === 0">
+                      Нет доступных занятий для снятия
                     </div>
                   </div>
                   <div class="form-actions">
