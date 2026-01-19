@@ -68,6 +68,7 @@ export interface StudentWithSubscriptions {
   student_id: number;
   name: string;
   subscriptions: Subscription[];
+  total_lessons_count?: number;
 }
 
 export interface AllStudentsSubscriptionsResponse {
@@ -81,4 +82,14 @@ export interface UpdateProfileRequest {
   specialty?: string; // for coaches
   experience?: string; // for coaches
   description?: string; // for coaches
+}
+
+export interface AddLessonsRequest {
+  subscription_id: number;
+  count: number;
+}
+
+export interface RemoveLessonsRequest {
+  subscription_id: number;
+  count: number;
 }

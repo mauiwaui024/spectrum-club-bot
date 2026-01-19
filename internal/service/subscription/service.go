@@ -133,3 +133,13 @@ func (s *subscriptionService) Create1For30Days(studentID int64) error {
 func (s *subscriptionService) DecrementRemainingLessons(studentID int64) error {
 	return s.subscriptionRepo.DecrementRemainingLessons(studentID)
 }
+
+// AddLessons добавляет занятия к абонементу
+func (s *subscriptionService) AddLessons(subscriptionID int64, count int) error {
+	return s.subscriptionRepo.AddLessons(subscriptionID, count)
+}
+
+// RemoveLessons снимает занятия с абонемента
+func (s *subscriptionService) RemoveLessons(subscriptionID int64, count int) error {
+	return s.subscriptionRepo.RemoveLessons(subscriptionID, count)
+}

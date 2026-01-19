@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { CalendarAPIResponse, TrainingDetails } from '../models/training.model';
-import { MyRegistrationsResponse, MySubscriptionResponse, MyProfileResponse, AllStudentsSubscriptionsResponse, UpdateProfileRequest } from '../models/student.model';
+import { MyRegistrationsResponse, MySubscriptionResponse, MyProfileResponse, AllStudentsSubscriptionsResponse, UpdateProfileRequest, Subscription } from '../models/student.model';
 
 @Injectable({
   providedIn: 'root'
@@ -213,6 +213,26 @@ export class CalendarService {
   // Обновить профиль пользователя
   updateProfile(data: UpdateProfileRequest): Observable<MyProfileResponse> {
     return this.http.put<MyProfileResponse>(`${this.apiUrl}/update-profile`, data, {
+      headers: this.getHeaders()
+    });
+  }
+
+  // Добавить занятия к абонементу (для тренеров)
+  addLessons(subscriptionId: number, count: number): Observable<Subscription> {
+    return this.http.post<Subscription>(`${this.apiUrl}/subscription/add-lessons`, {
+      subscription_id: subscriptionId,
+      count: count
+    }, {
+      headers: this.getHeaders()
+    });
+  }
+
+  // Снять занятия с абонемента (для тренеров)
+  removeLessons(subscriptionId: number, count: number): Observable<Subscription> {
+    return this.http.post<Subscription>(`${this.apiUrl}/subscription/remove-lessons`, {
+      subscription_id: subscriptionId,
+      count: count
+    }, {
       headers: this.getHeaders()
     });
   }

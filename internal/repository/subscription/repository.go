@@ -182,3 +182,62 @@ func (r *subscriptionRepository) DecrementRemainingLessons(studentID int64) erro
 	
 	return r.Update(subscription)
 }
+
+// AddLessons добавляет занятия к абонементу
+func (r *subscriptionRepository) AddLessons(subscriptionID int64, count int) error {
+	if count <= 0 {
+		return fmt.Errorf("количество занятий должно быть больше 0")
+	}
+
+	query := `
+		UPDATE spectrum.subscriptions
+		SET remaining_lessons = remaining_lessons + $1,
+		    total_lessons = total_lessons + $1,
+		    updated_at = CURRENT_TIMESTAMP
+		WHERE id = $2
+	`
+	result, err := r.db.Exec(query, count, subscriptionID)
+	if err != nil {
+		return fmt.Errorf("ошибка при добавлении занятий: %v", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("ошибка при проверке результата: %v", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("абонемент с ID %d не найден", subscriptionID)
+	}
+
+	return nil
+}
+
+// RemoveLessons снимает занятия с абонемента
+func (r *subscriptionRepository) RemoveLessons(subscriptionID int64, count int) error {
+	if count <= 0 {
+		return fmt.Errorf("количество занятий должно быть больше 0")
+	}
+
+	query := `
+		UPDATE spectrum.subscriptions
+		SET remaining_lessons = GREATEST(0, remaining_lessons - $1),
+		    updated_at = CURRENT_TIMESTAMP
+		WHERE id = $2
+	`
+	result, err := r.db.Exec(query, count, subscriptionID)
+	if err != nil {
+		return fmt.Errorf("ошибка при снятии занятий: %v", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("ошибка при проверке результата: %v", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("абонемент с ID %d не найден", subscriptionID)
+	}
+
+	return nil
+}

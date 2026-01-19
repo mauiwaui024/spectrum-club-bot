@@ -203,6 +203,8 @@ func main() {
 	mux.HandleFunc("/api/my-profile", calendarHandler.MyProfileAPI)
 	mux.HandleFunc("/api/update-profile", calendarHandler.UpdateProfileAPI)
 	mux.HandleFunc("/api/students-subscriptions", calendarHandler.AllStudentsSubscriptionsAPI)
+	mux.HandleFunc("/api/subscription/add-lessons", calendarHandler.AddLessonsAPI)
+	mux.HandleFunc("/api/subscription/remove-lessons", calendarHandler.RemoveLessonsAPI)
 
 	// Статические файлы Angular (для production)
 	// В development Angular dev server будет на порту 4200

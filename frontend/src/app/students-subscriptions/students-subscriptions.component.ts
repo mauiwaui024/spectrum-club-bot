@@ -1,13 +1,14 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import { CalendarService } from '../services/calendar.service';
 import { AllStudentsSubscriptionsResponse, StudentWithSubscriptions, Subscription } from '../models/student.model';
 
 @Component({
   selector: 'app-students-subscriptions',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, FormsModule],
   templateUrl: './students-subscriptions.component.html',
   styleUrls: ['./students-subscriptions.component.css']
 })
@@ -16,6 +17,10 @@ export class StudentsSubscriptionsComponent implements OnInit {
   loading: boolean = false;
   error: string | null = null;
   expandedStudents: Set<number> = new Set();
+  editingSubscriptionId: number | null = null;
+  addLessonsCount: number = 1;
+  removeLessonsCount: number = 1;
+  saving: boolean = false;
 
   constructor(private calendarService: CalendarService) {}
 
@@ -92,5 +97,99 @@ export class StudentsSubscriptionsComponent implements OnInit {
 
   getExpiredSubscriptions(student: StudentWithSubscriptions): Subscription[] {
     return student.subscriptions.filter(sub => sub.status !== 'active');
+  }
+
+  getTotalLessonsCount(student: StudentWithSubscriptions): number {
+    if (student.total_lessons_count !== undefined) {
+      return student.total_lessons_count;
+    }
+    // Fallback: подсчитываем из активных абонементов
+    return this.getActiveSubscriptions(student).reduce((sum, sub) => sum + sub.remaining_lessons, 0);
+  }
+
+  startEdit(subscription: Subscription) {
+    this.editingSubscriptionId = subscription.id;
+    this.addLessonsCount = 1;
+    this.removeLessonsCount = 1;
+    this.error = null;
+  }
+
+  cancelEdit() {
+    this.editingSubscriptionId = null;
+    this.addLessonsCount = 1;
+    this.removeLessonsCount = 1;
+    this.error = null;
+  }
+
+  isEditing(subscriptionId: number): boolean {
+    return this.editingSubscriptionId === subscriptionId;
+  }
+
+  addLessons(subscription: Subscription) {
+    if (this.addLessonsCount <= 0) {
+      this.error = 'Количество занятий должно быть больше 0';
+      return;
+    }
+
+    this.saving = true;
+    this.error = null;
+
+    this.calendarService.addLessons(subscription.id, this.addLessonsCount).subscribe({
+      next: (updatedSub) => {
+        // Обновляем абонемент в данных
+        if (this.data) {
+          for (const student of this.data.students) {
+            const subIndex = student.subscriptions.findIndex(s => s.id === subscription.id);
+            if (subIndex !== -1) {
+              student.subscriptions[subIndex] = updatedSub;
+              // Пересчитываем total_lessons_count
+              student.total_lessons_count = this.getTotalLessonsCount(student);
+            }
+          }
+        }
+        this.editingSubscriptionId = null;
+        this.saving = false;
+        this.addLessonsCount = 1;
+      },
+      error: (err) => {
+        this.error = 'Не удалось добавить занятия. Попробуйте позже.';
+        this.saving = false;
+        console.error('Error adding lessons:', err);
+      }
+    });
+  }
+
+  removeLessons(subscription: Subscription) {
+    if (this.removeLessonsCount <= 0) {
+      this.error = 'Количество занятий должно быть больше 0';
+      return;
+    }
+
+    this.saving = true;
+    this.error = null;
+
+    this.calendarService.removeLessons(subscription.id, this.removeLessonsCount).subscribe({
+      next: (updatedSub) => {
+        // Обновляем абонемент в данных
+        if (this.data) {
+          for (const student of this.data.students) {
+            const subIndex = student.subscriptions.findIndex(s => s.id === subscription.id);
+            if (subIndex !== -1) {
+              student.subscriptions[subIndex] = updatedSub;
+              // Пересчитываем total_lessons_count
+              student.total_lessons_count = this.getTotalLessonsCount(student);
+            }
+          }
+        }
+        this.editingSubscriptionId = null;
+        this.saving = false;
+        this.removeLessonsCount = 1;
+      },
+      error: (err) => {
+        this.error = 'Не удалось снять занятия. Попробуйте позже.';
+        this.saving = false;
+        console.error('Error removing lessons:', err);
+      }
+    });
   }
 }

@@ -1986,12 +1986,21 @@ func (h *Handler) AllStudentsSubscriptionsAPI(w http.ResponseWriter, r *http.Req
 			subscriptionData = append(subscriptionData, subData)
 		}
 
+		// Подсчитываем общее количество занятий из активных абонементов
+		totalLessonsCount := 0
+		for _, subscription := range subscriptions {
+			if subscription.RemainingLessons > 0 && subscription.EndDate.After(now) {
+				totalLessonsCount += subscription.RemainingLessons
+			}
+		}
+
 		// Добавляем студента с его абонементами
 		studentData := map[string]interface{}{
-			"user_id":       studentUser.ID,
-			"student_id":    student.ID,
-			"name":          studentUser.FirstName + " " + studentUser.LastName,
-			"subscriptions": subscriptionData,
+			"user_id":            studentUser.ID,
+			"student_id":         student.ID,
+			"name":               studentUser.FirstName + " " + studentUser.LastName,
+			"subscriptions":      subscriptionData,
+			"total_lessons_count": totalLessonsCount,
 		}
 
 		studentsWithSubscriptions = append(studentsWithSubscriptions, studentData)
@@ -2003,4 +2012,156 @@ func (h *Handler) AllStudentsSubscriptionsAPI(w http.ResponseWriter, r *http.Req
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
+}
+
+// AddLessonsAPI добавляет занятия к абонементу (только для тренеров)
+func (h *Handler) AddLessonsAPI(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Получаем userID и проверяем, что это тренер
+	userID, err := h.getUserIDFromRequest(r)
+	if err != nil {
+		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		return
+	}
+
+	user, err := h.userService.GetByID(userID)
+	if err != nil {
+		http.Error(w, "User not found: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if user.Role != "coach" {
+		http.Error(w, "Access denied: only coaches can modify subscriptions", http.StatusForbidden)
+		return
+	}
+
+	// Парсим JSON тело запроса
+	var requestData struct {
+		SubscriptionID int64 `json:"subscription_id"`
+		Count          int   `json:"count"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
+		http.Error(w, "Invalid JSON: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if requestData.Count <= 0 {
+		http.Error(w, "Count must be greater than 0", http.StatusBadRequest)
+		return
+	}
+
+	// Добавляем занятия
+	if err := h.subscriptionService.AddLessons(requestData.SubscriptionID, requestData.Count); err != nil {
+		http.Error(w, "Error adding lessons: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Получаем обновленный абонемент
+	allSubs, err := h.subscriptionService.GetAll()
+	if err == nil {
+		for _, sub := range allSubs {
+			if sub.ID == requestData.SubscriptionID {
+				response := map[string]interface{}{
+					"id":                sub.ID,
+					"total_lessons":     sub.TotalLessons,
+					"remaining_lessons": sub.RemainingLessons,
+					"used_lessons":      sub.TotalLessons - sub.RemainingLessons,
+					"start_date":        sub.StartDate.Format("2006-01-02"),
+					"end_date":          sub.EndDate.Format("2006-01-02"),
+					"created_at":        sub.CreatedAt.Format("2006-01-02"),
+				}
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(response)
+				return
+			}
+		}
+	}
+
+	// Если не нашли, возвращаем успешный ответ
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": "Lessons added successfully",
+	})
+}
+
+// RemoveLessonsAPI снимает занятия с абонемента (только для тренеров)
+func (h *Handler) RemoveLessonsAPI(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Получаем userID и проверяем, что это тренер
+	userID, err := h.getUserIDFromRequest(r)
+	if err != nil {
+		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		return
+	}
+
+	user, err := h.userService.GetByID(userID)
+	if err != nil {
+		http.Error(w, "User not found: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if user.Role != "coach" {
+		http.Error(w, "Access denied: only coaches can modify subscriptions", http.StatusForbidden)
+		return
+	}
+
+	// Парсим JSON тело запроса
+	var requestData struct {
+		SubscriptionID int64 `json:"subscription_id"`
+		Count          int   `json:"count"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
+		http.Error(w, "Invalid JSON: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if requestData.Count <= 0 {
+		http.Error(w, "Count must be greater than 0", http.StatusBadRequest)
+		return
+	}
+
+	// Снимаем занятия
+	if err := h.subscriptionService.RemoveLessons(requestData.SubscriptionID, requestData.Count); err != nil {
+		http.Error(w, "Error removing lessons: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Получаем обновленный абонемент
+	allSubs, err := h.subscriptionService.GetAll()
+	if err == nil {
+		for _, sub := range allSubs {
+			if sub.ID == requestData.SubscriptionID {
+				response := map[string]interface{}{
+					"id":                sub.ID,
+					"total_lessons":     sub.TotalLessons,
+					"remaining_lessons": sub.RemainingLessons,
+					"used_lessons":      sub.TotalLessons - sub.RemainingLessons,
+					"start_date":        sub.StartDate.Format("2006-01-02"),
+					"end_date":          sub.EndDate.Format("2006-01-02"),
+					"created_at":        sub.CreatedAt.Format("2006-01-02"),
+				}
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(response)
+				return
+			}
+		}
+	}
+
+	// Если не нашли, возвращаем успешный ответ
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": "Lessons removed successfully",
+	})
 }

@@ -19,9 +19,14 @@
         <div class="student-header" (click)="toggleStudent(student.student_id)">
           <div class="student-info">
             <h3>{{ student.name }}</h3>
-            <span class="subscriptions-count">
-              {{ student.subscriptions.length }} {{ student.subscriptions.length === 1 ? 'абонемент' : 'абонементов' }}
-            </span>
+            <div class="student-meta">
+              <span class="subscriptions-count">
+                {{ student.subscriptions.length }} {{ student.subscriptions.length === 1 ? 'абонемент' : 'абонементов' }}
+              </span>
+              <span class="lessons-count" *ngIf="getTotalLessonsCount(student) > 0">
+                • {{ getTotalLessonsCount(student) }} занятий
+              </span>
+            </div>
           </div>
           <span class="expand-icon">{{ isExpanded(student.student_id) ? '▼' : '▶' }}</span>
         </div>
@@ -35,9 +40,12 @@
               <div *ngFor="let sub of getActiveSubscriptions(student)" class="subscription-card active">
                 <div class="card-header">
                   <h5>Абонемент #{{ sub.id }}</h5>
-                  <span class="status-badge status-active">Активен</span>
+                  <div class="header-actions">
+                    <span class="status-badge status-active">Активен</span>
+                    <button class="edit-btn" (click)="startEdit(sub); $event.stopPropagation()" title="Редактировать" *ngIf="!isEditing(sub.id)">✏️</button>
+                  </div>
                 </div>
-                <div class="card-body">
+                <div class="card-body" *ngIf="!isEditing(sub.id)">
                   <div class="lessons-info">
                     <div class="lessons-count">
                       <span class="count-large">{{ sub.remaining_lessons }}</span>
@@ -60,6 +68,33 @@
                       <span class="label">📊 Использовано:</span>
                       <span class="value">{{ sub.used_lessons }} из {{ sub.total_lessons }}</span>
                     </div>
+                  </div>
+                </div>
+                <!-- Edit Form -->
+                <div class="edit-form" *ngIf="isEditing(sub.id)">
+                  <h4>Редактирование абонемента</h4>
+                  <div class="form-group">
+                    <label>Добавить занятия:</label>
+                    <div class="input-group">
+                      <input type="number" [(ngModel)]="addLessonsCount" min="1" class="form-input" placeholder="Количество">
+                      <button class="btn btn-primary" (click)="addLessons(sub)" [disabled]="saving">
+                        <span *ngIf="!saving">Добавить</span>
+                        <span *ngIf="saving">Сохранение...</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label>Снять занятия:</label>
+                    <div class="input-group">
+                      <input type="number" [(ngModel)]="removeLessonsCount" min="1" [max]="sub.remaining_lessons" class="form-input" placeholder="Количество">
+                      <button class="btn btn-secondary" (click)="removeLessons(sub)" [disabled]="saving">
+                        <span *ngIf="!saving">Снять</span>
+                        <span *ngIf="saving">Сохранение...</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="form-actions">
+                    <button class="btn btn-cancel" (click)="cancelEdit()" [disabled]="saving">Отмена</button>
                   </div>
                 </div>
               </div>

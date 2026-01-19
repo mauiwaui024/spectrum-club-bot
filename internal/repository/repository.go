@@ -42,6 +42,8 @@ type SubscriptionRepository interface {
 	GetHistoryByStudentID(studentID int64) ([]*models.Subscription, error)
 	Update(subscription *models.Subscription) error
 	DecrementRemainingLessons(studentID int64) error
+	AddLessons(subscriptionID int64, count int) error
+	RemoveLessons(subscriptionID int64, count int) error
 
 	///
 	GetAll() ([]*models.Subscription, error)
