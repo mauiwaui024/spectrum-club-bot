@@ -2014,28 +2014,37 @@ func (h *Handler) AllStudentsSubscriptionsAPI(w http.ResponseWriter, r *http.Req
 	json.NewEncoder(w).Encode(response)
 }
 
+// sendJSONError отправляет JSON ошибку
+func (h *Handler) sendJSONError(w http.ResponseWriter, statusCode int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"error": message,
+	})
+}
+
 // AddLessonsAPI добавляет занятия к абонементу (только для тренеров)
 func (h *Handler) AddLessonsAPI(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		h.sendJSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
 	}
 
 	// Получаем userID и проверяем, что это тренер
 	userID, err := h.getUserIDFromRequest(r)
 	if err != nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		h.sendJSONError(w, http.StatusUnauthorized, "Authentication required")
 		return
 	}
 
 	user, err := h.userService.GetByID(userID)
 	if err != nil {
-		http.Error(w, "User not found: "+err.Error(), http.StatusBadRequest)
+		h.sendJSONError(w, http.StatusBadRequest, "User not found: "+err.Error())
 		return
 	}
 
 	if user.Role != "coach" {
-		http.Error(w, "Access denied: only coaches can modify subscriptions", http.StatusForbidden)
+		h.sendJSONError(w, http.StatusForbidden, "Access denied: only coaches can modify subscriptions")
 		return
 	}
 
@@ -2046,18 +2055,18 @@ func (h *Handler) AddLessonsAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
-		http.Error(w, "Invalid JSON: "+err.Error(), http.StatusBadRequest)
+		h.sendJSONError(w, http.StatusBadRequest, "Invalid JSON: "+err.Error())
 		return
 	}
 
 	if requestData.Count <= 0 {
-		http.Error(w, "Count must be greater than 0", http.StatusBadRequest)
+		h.sendJSONError(w, http.StatusBadRequest, "Count must be greater than 0")
 		return
 	}
 
 	// Добавляем занятия
 	if err := h.subscriptionService.AddLessons(requestData.SubscriptionID, requestData.Count); err != nil {
-		http.Error(w, "Error adding lessons: "+err.Error(), http.StatusInternalServerError)
+		h.sendJSONError(w, http.StatusInternalServerError, "Error adding lessons: "+err.Error())
 		return
 	}
 
@@ -2093,25 +2102,25 @@ func (h *Handler) AddLessonsAPI(w http.ResponseWriter, r *http.Request) {
 // RemoveLessonsAPI снимает занятия с абонемента (только для тренеров)
 func (h *Handler) RemoveLessonsAPI(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		h.sendJSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
 	}
 
 	// Получаем userID и проверяем, что это тренер
 	userID, err := h.getUserIDFromRequest(r)
 	if err != nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		h.sendJSONError(w, http.StatusUnauthorized, "Authentication required")
 		return
 	}
 
 	user, err := h.userService.GetByID(userID)
 	if err != nil {
-		http.Error(w, "User not found: "+err.Error(), http.StatusBadRequest)
+		h.sendJSONError(w, http.StatusBadRequest, "User not found: "+err.Error())
 		return
 	}
 
 	if user.Role != "coach" {
-		http.Error(w, "Access denied: only coaches can modify subscriptions", http.StatusForbidden)
+		h.sendJSONError(w, http.StatusForbidden, "Access denied: only coaches can modify subscriptions")
 		return
 	}
 
@@ -2122,18 +2131,18 @@ func (h *Handler) RemoveLessonsAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
-		http.Error(w, "Invalid JSON: "+err.Error(), http.StatusBadRequest)
+		h.sendJSONError(w, http.StatusBadRequest, "Invalid JSON: "+err.Error())
 		return
 	}
 
 	if requestData.Count <= 0 {
-		http.Error(w, "Count must be greater than 0", http.StatusBadRequest)
+		h.sendJSONError(w, http.StatusBadRequest, "Count must be greater than 0")
 		return
 	}
 
 	// Снимаем занятия
 	if err := h.subscriptionService.RemoveLessons(requestData.SubscriptionID, requestData.Count); err != nil {
-		http.Error(w, "Error removing lessons: "+err.Error(), http.StatusInternalServerError)
+		h.sendJSONError(w, http.StatusInternalServerError, "Error removing lessons: "+err.Error())
 		return
 	}
 

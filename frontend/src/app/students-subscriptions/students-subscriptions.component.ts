@@ -152,7 +152,15 @@ export class StudentsSubscriptionsComponent implements OnInit {
         this.addLessonsCount = 1;
       },
       error: (err) => {
-        this.error = 'Не удалось добавить занятия. Попробуйте позже.';
+        let errorMessage = 'Не удалось добавить занятия. Попробуйте позже.';
+        if (err.error && err.error.error) {
+          errorMessage = err.error.error;
+        } else if (err.error && typeof err.error === 'string') {
+          errorMessage = err.error;
+        } else if (err.message) {
+          errorMessage = err.message;
+        }
+        this.error = errorMessage;
         this.saving = false;
         console.error('Error adding lessons:', err);
       }
@@ -186,7 +194,15 @@ export class StudentsSubscriptionsComponent implements OnInit {
         this.removeLessonsCount = 1;
       },
       error: (err) => {
-        this.error = 'Не удалось снять занятия. Попробуйте позже.';
+        let errorMessage = 'Не удалось снять занятия. Попробуйте позже.';
+        if (err.error && err.error.error) {
+          errorMessage = err.error.error;
+        } else if (err.error && typeof err.error === 'string') {
+          errorMessage = err.error;
+        } else if (err.message) {
+          errorMessage = err.message;
+        }
+        this.error = errorMessage;
         this.saving = false;
         console.error('Error removing lessons:', err);
       }
