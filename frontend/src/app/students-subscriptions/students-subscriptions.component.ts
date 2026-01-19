@@ -118,14 +118,19 @@ export class StudentsSubscriptionsComponent implements OnInit {
       maxTypeLimit = 16;
     }
 
-    // Максимум, который можно добавить до лимита типа
-    const maxToTypeLimit = maxTypeLimit - sub.total_lessons;
-    
     // Максимум, который можно добавить до исходного количества (использованные занятия)
     const maxToOriginal = sub.total_lessons - sub.remaining_lessons;
 
+    // Если уже достигнут или превышен лимит типа, можно только вернуть использованные занятия
+    if (sub.total_lessons >= maxTypeLimit) {
+      return maxToOriginal;
+    }
+
+    // Максимум, который можно добавить до лимита типа
+    const maxToTypeLimit = maxTypeLimit - sub.total_lessons;
+    
     // Возвращаем минимум из двух ограничений
-    return Math.min(maxToTypeLimit > 0 ? maxToTypeLimit : 0, maxToOriginal);
+    return Math.min(maxToTypeLimit, maxToOriginal);
   }
 
   startEdit(subscription: Subscription) {
