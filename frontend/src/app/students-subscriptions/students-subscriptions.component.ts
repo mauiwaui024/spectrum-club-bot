@@ -15,7 +15,8 @@ import { AllStudentsSubscriptionsResponse, StudentWithSubscriptions, Subscriptio
 export class StudentsSubscriptionsComponent implements OnInit {
   data: AllStudentsSubscriptionsResponse | null = null;
   loading: boolean = false;
-  error: string | null = null;
+  error: string | null = null; // Общая ошибка загрузки данных
+  editError: string | null = null; // Ошибка редактирования (показывается только в форме)
   expandedStudents: Set<number> = new Set();
   editingSubscriptionId: number | null = null;
   addLessonsCount: number = 1;
@@ -137,14 +138,14 @@ export class StudentsSubscriptionsComponent implements OnInit {
     this.editingSubscriptionId = subscription.id;
     this.addLessonsCount = 1;
     this.removeLessonsCount = 1;
-    this.error = null;
+    this.editError = null;
   }
 
   cancelEdit() {
     this.editingSubscriptionId = null;
     this.addLessonsCount = 1;
     this.removeLessonsCount = 1;
-    this.error = null;
+    this.editError = null;
   }
 
   isEditing(subscriptionId: number): boolean {
@@ -153,7 +154,7 @@ export class StudentsSubscriptionsComponent implements OnInit {
 
   addLessons(subscription: Subscription) {
     if (this.addLessonsCount <= 0) {
-      this.error = 'Количество занятий должно быть больше 0';
+      this.editError = 'Количество занятий должно быть больше 0';
       return;
     }
 
@@ -169,12 +170,12 @@ export class StudentsSubscriptionsComponent implements OnInit {
       } else {
         maxTypeLimit = 16;
       }
-      this.error = `Можно добавить максимум ${maxToAdd} занятий (до исходного лимита абонемента ${maxTypeLimit} занятий)`;
+      this.editError = `Можно добавить максимум ${maxToAdd} занятий (до исходного лимита абонемента ${maxTypeLimit} занятий)`;
       return;
     }
 
     this.saving = true;
-    this.error = null;
+    this.editError = null;
 
     this.calendarService.addLessons(subscription.id, this.addLessonsCount).subscribe({
       next: (updatedSub) => {
@@ -192,6 +193,7 @@ export class StudentsSubscriptionsComponent implements OnInit {
         this.editingSubscriptionId = null;
         this.saving = false;
         this.addLessonsCount = 1;
+        this.editError = null;
       },
       error: (err) => {
         let errorMessage = 'Не удалось добавить занятия. Попробуйте позже.';
@@ -202,7 +204,7 @@ export class StudentsSubscriptionsComponent implements OnInit {
         } else if (err.message) {
           errorMessage = err.message;
         }
-        this.error = errorMessage;
+        this.editError = errorMessage;
         this.saving = false;
         console.error('Error adding lessons:', err);
       }
@@ -211,18 +213,18 @@ export class StudentsSubscriptionsComponent implements OnInit {
 
   removeLessons(subscription: Subscription) {
     if (this.removeLessonsCount <= 0) {
-      this.error = 'Количество занятий должно быть больше 0';
+      this.editError = 'Количество занятий должно быть больше 0';
       return;
     }
 
     // Валидация: проверяем, что достаточно занятий для снятия
     if (this.removeLessonsCount > subscription.remaining_lessons) {
-      this.error = `Недостаточно занятий. Доступно: ${subscription.remaining_lessons}`;
+      this.editError = `Недостаточно занятий. Доступно: ${subscription.remaining_lessons}`;
       return;
     }
 
     this.saving = true;
-    this.error = null;
+    this.editError = null;
 
     this.calendarService.removeLessons(subscription.id, this.removeLessonsCount).subscribe({
       next: (updatedSub) => {
@@ -240,6 +242,7 @@ export class StudentsSubscriptionsComponent implements OnInit {
         this.editingSubscriptionId = null;
         this.saving = false;
         this.removeLessonsCount = 1;
+        this.editError = null;
       },
       error: (err) => {
         let errorMessage = 'Не удалось снять занятия. Попробуйте позже.';
@@ -250,7 +253,7 @@ export class StudentsSubscriptionsComponent implements OnInit {
         } else if (err.message) {
           errorMessage = err.message;
         }
-        this.error = errorMessage;
+        this.editError = errorMessage;
         this.saving = false;
         console.error('Error removing lessons:', err);
       }

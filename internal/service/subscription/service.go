@@ -156,20 +156,26 @@ func (s *subscriptionService) AddLessons(subscriptionID int64, count int) error 
 		maxTypeLimit = 16
 	}
 
-	// Проверяем, что после добавления не превысим лимит типа
-	newTotalLessons := subscription.TotalLessons + count
-	if newTotalLessons > maxTypeLimit {
-		possibleToAdd := maxTypeLimit - subscription.TotalLessons
-		if possibleToAdd < 0 {
-			possibleToAdd = 0
-		}
-		return fmt.Errorf("можно добавить максимум %d занятий (до исходного лимита абонемента %d занятий)", possibleToAdd, maxTypeLimit)
-	}
+	// Максимум, который можно добавить до исходного количества (использованные занятия)
+	possibleToAddUsed := subscription.TotalLessons - subscription.RemainingLessons
 
-	// Проверяем, что не добавляем больше, чем было использовано
-	possibleToAdd := subscription.TotalLessons - subscription.RemainingLessons
-	if count > possibleToAdd {
-		return fmt.Errorf("можно добавить максимум %d занятий (до исходного лимита абонемента %d занятий)", possibleToAdd, maxTypeLimit)
+	// Если уже достигнут или превышен лимит типа, можно только вернуть использованные занятия
+	if subscription.TotalLessons >= maxTypeLimit {
+		if count > possibleToAddUsed {
+			return fmt.Errorf("можно добавить максимум %d занятий (до исходного лимита абонемента %d занятий)", possibleToAddUsed, maxTypeLimit)
+		}
+	} else {
+		// Если ниже лимита типа, проверяем оба ограничения
+		// Максимум до лимита типа
+		possibleToAddToLimit := maxTypeLimit - subscription.TotalLessons
+		// Берем минимум из двух ограничений
+		possibleToAdd := possibleToAddUsed
+		if possibleToAddToLimit < possibleToAddUsed {
+			possibleToAdd = possibleToAddToLimit
+		}
+		if count > possibleToAdd {
+			return fmt.Errorf("можно добавить максимум %d занятий (до исходного лимита абонемента %d занятий)", possibleToAdd, maxTypeLimit)
+		}
 	}
 
 	return s.subscriptionRepo.AddLessons(subscriptionID, count)

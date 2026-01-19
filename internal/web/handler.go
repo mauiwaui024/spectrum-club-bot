@@ -2079,8 +2079,19 @@ func (h *Handler) AddLessonsAPI(w http.ResponseWriter, r *http.Request) {
 	// Получаем обновленный абонемент
 	allSubs, err := h.subscriptionService.GetAll()
 	if err == nil {
+		now := time.Now()
 		for _, sub := range allSubs {
 			if sub.ID == requestData.SubscriptionID {
+				// Определяем статус
+				var status string
+				if sub.RemainingLessons == 0 {
+					status = "used"
+				} else if sub.EndDate.Before(now) || sub.EndDate.Equal(now) {
+					status = "expired"
+				} else {
+					status = "active"
+				}
+
 				response := map[string]interface{}{
 					"id":                sub.ID,
 					"total_lessons":     sub.TotalLessons,
@@ -2089,6 +2100,7 @@ func (h *Handler) AddLessonsAPI(w http.ResponseWriter, r *http.Request) {
 					"start_date":        sub.StartDate.Format("2006-01-02"),
 					"end_date":          sub.EndDate.Format("2006-01-02"),
 					"created_at":        sub.CreatedAt.Format("2006-01-02"),
+					"status":            status,
 				}
 				w.Header().Set("Content-Type", "application/json")
 				json.NewEncoder(w).Encode(response)
@@ -2155,8 +2167,19 @@ func (h *Handler) RemoveLessonsAPI(w http.ResponseWriter, r *http.Request) {
 	// Получаем обновленный абонемент
 	allSubs, err := h.subscriptionService.GetAll()
 	if err == nil {
+		now := time.Now()
 		for _, sub := range allSubs {
 			if sub.ID == requestData.SubscriptionID {
+				// Определяем статус
+				var status string
+				if sub.RemainingLessons == 0 {
+					status = "used"
+				} else if sub.EndDate.Before(now) || sub.EndDate.Equal(now) {
+					status = "expired"
+				} else {
+					status = "active"
+				}
+
 				response := map[string]interface{}{
 					"id":                sub.ID,
 					"total_lessons":     sub.TotalLessons,
@@ -2165,6 +2188,7 @@ func (h *Handler) RemoveLessonsAPI(w http.ResponseWriter, r *http.Request) {
 					"start_date":        sub.StartDate.Format("2006-01-02"),
 					"end_date":          sub.EndDate.Format("2006-01-02"),
 					"created_at":        sub.CreatedAt.Format("2006-01-02"),
+					"status":            status,
 				}
 				w.Header().Set("Content-Type", "application/json")
 				json.NewEncoder(w).Encode(response)
