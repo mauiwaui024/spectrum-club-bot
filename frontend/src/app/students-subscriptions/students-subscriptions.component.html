@@ -102,40 +102,6 @@
             </div>
           </div>
 
-          <!-- Expired/Used Subscriptions -->
-          <div *ngIf="getExpiredSubscriptions(student).length > 0" class="subscriptions-section">
-            <h4>⏰ История абонементов</h4>
-            <div class="subscriptions-list">
-              <div *ngFor="let sub of getExpiredSubscriptions(student)" class="subscription-card expired">
-                <div class="card-header">
-                  <h5>Абонемент #{{ sub.id }}</h5>
-                  <span class="status-badge" [ngClass]="getStatusClass(sub)">{{ getStatusText(sub) }}</span>
-                </div>
-                <div class="card-body">
-                  <div class="lessons-info">
-                    <div class="lessons-count">
-                      <span class="count-large">{{ sub.remaining_lessons }}</span>
-                      <span class="count-label">из {{ sub.total_lessons }} занятий</span>
-                    </div>
-                    <div class="progress-bar">
-                      <div class="progress-fill" [style.width.%]="getProgressPercentage(sub)"></div>
-                    </div>
-                  </div>
-                  <div class="info-grid">
-                    <div class="info-item">
-                      <span class="label">📅 Период:</span>
-                      <span class="value">{{ formatDate(sub.start_date) }} - {{ formatDate(sub.end_date) }}</span>
-                    </div>
-                    <div class="info-item">
-                      <span class="label">📊 Использовано:</span>
-                      <span class="value">{{ sub.used_lessons }} из {{ sub.total_lessons }}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
           <!-- No Subscriptions -->
           <div *ngIf="student.subscriptions.length === 0" class="empty-state">
             <p>📭 У ученика нет абонементов.</p>
