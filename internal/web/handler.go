@@ -901,7 +901,21 @@ func (h *Handler) RegisterForTraining(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Проверяем, не прошла ли тренировка
-	if training.TrainingDate.Before(time.Now()) {
+	// Создаем полную дату и время начала тренировки для правильного сравнения
+	trainingStartTime := time.Date(
+		training.TrainingDate.Year(),
+		training.TrainingDate.Month(),
+		training.TrainingDate.Day(),
+		training.StartTime.Hour(),
+		training.StartTime.Minute(),
+		training.StartTime.Second(),
+		0,
+		training.TrainingDate.Location(),
+	)
+	// Разрешаем запись в течение часа после начала тренировки
+	now := time.Now()
+	deadlineTime := trainingStartTime.Add(1 * time.Hour)
+	if now.After(deadlineTime) {
 		http.Error(w, "Training has already passed", http.StatusBadRequest)
 		return
 	}
@@ -1011,7 +1025,21 @@ func (h *Handler) CancelRegistration(w http.ResponseWriter, r *http.Request) {
 	training, err := h.scheduleService.GetTrainingByID(trainingID)
 	if err == nil {
 		// Можно отменить только если тренировка в будущем
-		if training.TrainingDate.Before(time.Now()) {
+		// Создаем полную дату и время начала тренировки для правильного сравнения
+		trainingStartTime := time.Date(
+			training.TrainingDate.Year(),
+			training.TrainingDate.Month(),
+			training.TrainingDate.Day(),
+			training.StartTime.Hour(),
+			training.StartTime.Minute(),
+			training.StartTime.Second(),
+			0,
+			training.TrainingDate.Location(),
+		)
+		// Разрешаем отмену в течение часа после начала тренировки
+		now := time.Now()
+		deadlineTime := trainingStartTime.Add(1 * time.Hour)
+		if now.After(deadlineTime) {
 			http.Error(w, "Cannot cancel past training", http.StatusBadRequest)
 			return
 		}
