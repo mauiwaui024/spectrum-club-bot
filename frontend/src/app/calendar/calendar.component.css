@@ -76,16 +76,16 @@
 }
 
 .logo {
-  font-weight: 500;
-  font-size: 18px;
-  color: #6366f1;
+  display: flex;
+  align-items: center;
   text-decoration: none;
-  white-space: nowrap;
   flex-shrink: 0;
 }
 
-.logo span {
-  color: #ec4899;
+.logo-img {
+  height: 40px;
+  width: auto;
+  object-fit: contain;
 }
 
 
@@ -462,8 +462,8 @@
     gap: 8px;
   }
 
-  .logo {
-    font-size: 16px;
+  .logo-img {
+    height: 32px;
   }
 
 
@@ -543,8 +543,8 @@
     padding: 20px 24px;
   }
 
-  .logo {
-    font-size: 22px;
+  .logo-img {
+    height: 48px;
   }
 
   .current-date {
