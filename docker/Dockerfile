@@ -18,7 +18,7 @@ COPY frontend/ ./frontend/
 RUN cd frontend && npm run build -- --configuration production
 
 # Этап 2: Go build
-FROM golang:1.24.3-alpine AS go-builder
+FROM golang:1.25.0-alpine AS go-builder
 
 WORKDIR /app
 
