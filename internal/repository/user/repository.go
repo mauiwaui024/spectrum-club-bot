@@ -46,11 +46,28 @@ func (r *userRepository) GetByTelegramID(telegramID int64) (*models.User, error)
 	return &user, err
 }
 
+func (r *userRepository) GetByUsername(username string) (*models.User, error) {
+	var user models.User
+	query := `SELECT * FROM spectrum.users WHERE username = $1`
+	err := r.db.Get(&user, query, username)
+	return &user, err
+}
+
 func (r *userRepository) GetByID(id int64) (*models.User, error) {
 	var user models.User
 	query := `SELECT * FROM spectrum.users WHERE id = $1`
 	err := r.db.Get(&user, query, id)
 	return &user, err
+}
+
+func (r *userRepository) SetPasswordHash(userID int64, passwordHash string) error {
+	query := `
+		UPDATE spectrum.users
+		SET password_hash = $1, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $2
+	`
+	_, err := r.db.Exec(query, passwordHash, userID)
+	return err
 }
 
 func (r *userRepository) UpdateRole(telegramID int64, role string) error {

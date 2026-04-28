@@ -1,10 +1,17 @@
 package user_service
 
 import (
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/hex"
+	"fmt"
+	"strings"
 	"spectrum-club-bot/internal/models"
 	"spectrum-club-bot/internal/repository"
 	"spectrum-club-bot/internal/service"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 type userService struct {
@@ -134,6 +141,45 @@ func (s *userService) GetByTelegramID(telegramID int64) (*models.User, error) {
 	return s.userRepo.GetByTelegramID(telegramID)
 }
 
+func (s *userService) GetByUsername(username string) (*models.User, error) {
+	return s.userRepo.GetByUsername(username)
+}
+
 func (s *userService) UpdateProfile(userID int64, firstName, lastName *string) error {
 	return s.userRepo.UpdateUser(userID, firstName, lastName)
+}
+
+func (s *userService) SetBrowserPassword(userID int64, plainPassword string) error {
+	plainPassword = strings.TrimSpace(plainPassword)
+	if len(plainPassword) < 8 {
+		return fmt.Errorf("password must be at least 8 characters")
+	}
+
+	passwordHashBytes, err := bcrypt.GenerateFromPassword([]byte(plainPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	return s.userRepo.SetPasswordHash(userID, string(passwordHashBytes))
+}
+
+func (s *userService) VerifyBrowserPassword(user *models.User, plainPassword string) bool {
+	if user == nil || user.PasswordHash == nil || *user.PasswordHash == "" {
+		return false
+	}
+
+	// Primary format: bcrypt hash.
+	if strings.HasPrefix(*user.PasswordHash, "$2a$") || strings.HasPrefix(*user.PasswordHash, "$2b$") || strings.HasPrefix(*user.PasswordHash, "$2y$") {
+		return bcrypt.CompareHashAndPassword([]byte(*user.PasswordHash), []byte(plainPassword)) == nil
+	}
+
+	// Backward compatibility for already-issued legacy hashes.
+	parts := strings.Split(*user.PasswordHash, "$")
+	if len(parts) != 3 || parts[0] != "sha256" {
+		return false
+	}
+	sum := sha256.Sum256([]byte(parts[1] + ":" + plainPassword))
+	actualHashHex := hex.EncodeToString(sum[:])
+	expectedHashHex := parts[2]
+
+	return subtle.ConstantTimeCompare([]byte(actualHashHex), []byte(expectedHashHex)) == 1
 }

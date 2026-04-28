@@ -11,9 +11,11 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"spectrum-club-bot/internal/models"
@@ -28,6 +30,14 @@ type Handler struct {
 	userService         service.UserService
 	subscriptionService service.SubscriptionService
 	botToken            string // Для проверки Telegram WebApp initData
+	allowLegacyUserID   bool
+	sessions            map[string]browserSession
+	sessionsMu          sync.RWMutex
+}
+
+type browserSession struct {
+	UserID    int64
+	ExpiresAt time.Time
 }
 
 func NewHandler(
@@ -47,6 +57,8 @@ func NewHandler(
 		userService:         userService,
 		subscriptionService: subscriptionService,
 		botToken:            botToken,
+		allowLegacyUserID:   strings.ToLower(os.Getenv("ALLOW_LEGACY_USER_ID_FALLBACK")) == "true" || strings.ToLower(os.Getenv("ENVIRONMENT")) != "production",
+		sessions:            make(map[string]browserSession),
 	}
 }
 
@@ -834,30 +846,12 @@ func (h *Handler) RegisterForTraining(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Получаем userID из initData (безопасный способ) или из формы (fallback)
+	// Получаем userID через unified auth (initData или browser session)
 	userID, authErr := h.getUserIDFromRequest(r)
 	if authErr != nil {
-		log.Printf("[RegisterForTraining] ОШИБКА аутентификации через initData: %v", authErr)
-		log.Printf("[RegisterForTraining] initData в заголовке: %v (длина: %d)",
-			r.Header.Get("X-Telegram-Init-Data") != "", len(r.Header.Get("X-Telegram-Init-Data")))
-
-		// Fallback: из формы (для обратной совместимости)
-		userIDStr := r.FormValue("user_id")
-		log.Printf("[RegisterForTraining] Пробуем fallback: user_id из формы: %s", userIDStr)
-
-		if userIDStr == "" {
-			log.Printf("[RegisterForTraining] ❌ Аутентификация не удалась: нет ни initData, ни user_id")
-			http.Error(w, "Authentication required: Необходимо войти в систему. Пожалуйста, откройте календарь через Telegram бота.", http.StatusUnauthorized)
-			return
-		}
-		userID, err = strconv.ParseInt(userIDStr, 10, 64)
-		if err != nil {
-			http.Error(w, "Invalid user ID", http.StatusBadRequest)
-			return
-		}
-		log.Printf("[RegisterForTraining] ✅ Использован fallback: userID из формы: %d", userID)
-	} else {
-		log.Printf("[RegisterForTraining] ✅ Аутентификация успешна через initData, userID: %d", userID)
+		log.Printf("[RegisterForTraining] auth failed: %v", authErr)
+		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		return
 	}
 
 	// Проверяем роль пользователя - только студенты могут записываться на тренировки
@@ -978,20 +972,11 @@ func (h *Handler) CancelRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Получаем userID из initData (безопасный способ) или из формы (fallback)
+	// Получаем userID через unified auth (initData или browser session)
 	userID, authErr := h.getUserIDFromRequest(r)
 	if authErr != nil {
-		// Fallback: из формы (для обратной совместимости)
-		userIDStr := r.FormValue("user_id")
-		if userIDStr == "" {
-			http.Error(w, "Authentication required", http.StatusUnauthorized)
-			return
-		}
-		userID, err = strconv.ParseInt(userIDStr, 10, 64)
-		if err != nil {
-			http.Error(w, "Invalid user ID", http.StatusBadRequest)
-			return
-		}
+		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		return
 	}
 
 	// Проверяем роль пользователя - только студенты могут отменять записи
@@ -1237,16 +1222,11 @@ func (h *Handler) CheckRegistration(w http.ResponseWriter, r *http.Request) {
 
 	trainingID, _ := strconv.Atoi(trainingIDStr)
 
-	// Получаем userID из initData (безопасный способ) или из query параметра (fallback)
+	// Получаем userID через unified auth (initData или browser session)
 	userID, err := h.getUserIDFromRequest(r)
 	if err != nil {
-		// Fallback: из query параметра (для обратной совместимости)
-		userIDStr := r.URL.Query().Get("user_id")
-		if userIDStr == "" {
-			http.Error(w, "Authentication required", http.StatusUnauthorized)
-			return
-		}
-		userID, _ = strconv.ParseInt(userIDStr, 10, 64)
+		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		return
 	}
 
 	student, err := h.studentService.GetStudentByUserID(userID)
@@ -1403,48 +1383,36 @@ func (h *Handler) AuthAPI(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// getUserIDFromRequest извлекает userID из запроса через initData или query параметр (fallback)
+// getUserIDFromRequest извлекает userID через initData или browser session cookie.
 func (h *Handler) getUserIDFromRequest(r *http.Request) (int64, error) {
-	// Пробуем получить из initData (безопасный способ)
+	// 1) Telegram WebApp initData
 	initData := r.Header.Get("X-Telegram-Init-Data")
 	if initData != "" {
-		log.Printf("[getUserIDFromRequest] initData получен, длина: %d", len(initData))
-		log.Printf("[getUserIDFromRequest] initData (первые 100 символов): %s",
-			func() string {
-				if len(initData) > 100 {
-					return initData[:100] + "..."
-				}
-				return initData
-			}())
-
 		telegramID, err := h.verifyTelegramWebAppData(initData)
 		if err == nil {
-			log.Printf("[getUserIDFromRequest] initData проверен успешно, telegramID: %d", telegramID)
 			user, err := h.userService.GetByTelegramID(telegramID)
 			if err == nil {
-				log.Printf("[getUserIDFromRequest] Пользователь найден, userID: %d", user.ID)
 				return user.ID, nil
-			} else {
-				log.Printf("[getUserIDFromRequest] Пользователь не найден по telegramID %d: %v", telegramID, err)
 			}
-		} else {
-			log.Printf("[getUserIDFromRequest] Ошибка проверки initData: %v", err)
-		}
-	} else {
-		log.Printf("[getUserIDFromRequest] initData не найден в заголовках")
-	}
-
-	// Fallback: из query параметра (для обратной совместимости, но небезопасно)
-	userIDStr := r.URL.Query().Get("user_id")
-	if userIDStr != "" {
-		log.Printf("[getUserIDFromRequest] Используется fallback: user_id из query параметра: %s", userIDStr)
-		userID, err := strconv.ParseInt(userIDStr, 10, 64)
-		if err == nil {
-			return userID, nil
 		}
 	}
 
-	log.Printf("[getUserIDFromRequest] Аутентификация не удалась: initData пустой и user_id не найден")
+	// 2) Browser session cookie
+	if userID, ok := h.getUserIDFromSession(r); ok {
+		return userID, nil
+	}
+
+	// 3) Legacy fallback for non-production or explicit opt-in
+	if h.allowLegacyUserID {
+		userIDStr := r.URL.Query().Get("user_id")
+		if userIDStr != "" {
+			userID, err := strconv.ParseInt(userIDStr, 10, 64)
+			if err == nil {
+				return userID, nil
+			}
+		}
+	}
+
 	return 0, fmt.Errorf("user not authenticated")
 }
 
@@ -1528,16 +1496,11 @@ func (h *Handler) MyRegistrationsAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Получаем userID из initData или query параметра (fallback)
+	// Получаем userID через unified auth (initData или browser session)
 	userID, err := h.getUserIDFromRequest(r)
 	if err != nil {
-		// Fallback: из query параметра (для обратной совместимости)
-		userIDStr := r.URL.Query().Get("user_id")
-		if userIDStr == "" {
-			http.Error(w, "Authentication required", http.StatusUnauthorized)
-			return
-		}
-		userID, _ = strconv.ParseInt(userIDStr, 10, 64)
+		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		return
 	}
 
 	// Проверяем роль пользователя - только студенты
@@ -1635,16 +1598,11 @@ func (h *Handler) MySubscriptionAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Получаем userID из initData или query параметра (fallback)
+	// Получаем userID через unified auth (initData или browser session)
 	userID, err := h.getUserIDFromRequest(r)
 	if err != nil {
-		// Fallback: из query параметра (для обратной совместимости)
-		userIDStr := r.URL.Query().Get("user_id")
-		if userIDStr == "" {
-			http.Error(w, "Authentication required", http.StatusUnauthorized)
-			return
-		}
-		userID, _ = strconv.ParseInt(userIDStr, 10, 64)
+		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		return
 	}
 
 	// Проверяем роль пользователя - только студенты
@@ -1717,16 +1675,11 @@ func (h *Handler) MyProfileAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Получаем userID из initData или query параметра (fallback)
+	// Получаем userID через unified auth (initData или browser session)
 	userID, err := h.getUserIDFromRequest(r)
 	if err != nil {
-		// Fallback: из query параметра (для обратной совместимости)
-		userIDStr := r.URL.Query().Get("user_id")
-		if userIDStr == "" {
-			http.Error(w, "Authentication required", http.StatusUnauthorized)
-			return
-		}
-		userID, _ = strconv.ParseInt(userIDStr, 10, 64)
+		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		return
 	}
 
 	// Получаем пользователя
@@ -1789,16 +1742,11 @@ func (h *Handler) UpdateProfileAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Получаем userID из initData или query параметра (fallback)
+	// Получаем userID через unified auth (initData или browser session)
 	userID, err := h.getUserIDFromRequest(r)
 	if err != nil {
-		// Fallback: из query параметра (для обратной совместимости)
-		userIDStr := r.URL.Query().Get("user_id")
-		if userIDStr == "" {
-			http.Error(w, "Authentication required", http.StatusUnauthorized)
-			return
-		}
-		userID, _ = strconv.ParseInt(userIDStr, 10, 64)
+		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		return
 	}
 
 	// Получаем пользователя
@@ -1940,16 +1888,11 @@ func (h *Handler) AllStudentsSubscriptionsAPI(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Получаем userID из initData или query параметра (fallback)
+	// Получаем userID через unified auth (initData или browser session)
 	userID, err := h.getUserIDFromRequest(r)
 	if err != nil {
-		// Fallback: из query параметра (для обратной совместимости)
-		userIDStr := r.URL.Query().Get("user_id")
-		if userIDStr == "" {
-			http.Error(w, "Authentication required", http.StatusUnauthorized)
-			return
-		}
-		userID, _ = strconv.ParseInt(userIDStr, 10, 64)
+		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		return
 	}
 
 	// Проверяем, что пользователь - тренер

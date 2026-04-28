@@ -50,42 +50,38 @@ export class CalendarComponent implements OnInit {
   ) {
   }
 
-  // Получаем userID из разных источников (для обратной совместимости)
-  // В идеале userID не должен использоваться на фронтенде, все запросы идут с initData в заголовках
-  private getUserId(): string | null {
-    // 1. Из query параметров (fallback для обратной совместимости)
-    const queryUserId = this.route.snapshot.queryParams['user_id'];
-    if (queryUserId) {
-      return queryUserId;
-    }
-
-    // 2. Из localStorage (если был сохранен ранее через старый способ)
-    const storedUserId = localStorage.getItem('user_id');
-    if (storedUserId) {
-      return storedUserId;
-    }
-
-    return null;
-  }
-
   ngOnInit() {
     // Обновляем initData при инициализации компонента
     this.calendarService.updateInitData();
+
+    const tg = (window as any).Telegram?.WebApp;
+    const hasInitData = !!(tg && tg.initData && tg.initData.length > 0);
+    if (!hasInitData) {
+      this.calendarService.getAuthStatus().subscribe({
+        next: (status: any) => {
+          if (!status?.authenticated) {
+            this.router.navigate(['/login'], { queryParams: { redirect: this.router.url } });
+          }
+        },
+        error: () => {
+          this.router.navigate(['/login'], { queryParams: { redirect: this.router.url } });
+        }
+      });
+    }
     
     // Проверяем наличие initData после небольшой задержки (для WebApp инициализации)
     setTimeout(() => {
-      const tg = (window as any).Telegram?.WebApp;
       if (tg) {
-        const hasInitData = tg.initData && tg.initData.length > 0;
+        const hasInitDataInner = tg.initData && tg.initData.length > 0;
         console.log('🔍 Проверка initData при загрузке календаря:', {
-          hasInitData,
+          hasInitData: hasInitDataInner,
           initDataLength: tg.initData?.length || 0,
           platform: tg.platform || 'unknown',
           version: tg.version || 'unknown',
           ready: tg.ready || false
         });
         
-        if (hasInitData) {
+        if (hasInitDataInner) {
           console.log('✅ initData успешно получен через WebApp кнопку!');
         } else {
           console.warn('⚠️ initData пустой. Убедитесь, что страница открыта через WebApp кнопку в Telegram боте.');
@@ -112,17 +108,15 @@ export class CalendarComponent implements OnInit {
 
       const viewStr = this.view === CalendarView.Week ? 'week' : 
                      this.view === CalendarView.Day ? 'day' : 'month';
-      // Пробуем получить user_id из query параметров для fallback (если initData нет)
-      const userIdParam = params['user_id'] || null;
-      this.loadCalendar(userIdParam, viewStr, date);
+      this.loadCalendar(viewStr, date);
     });
   }
 
-  loadCalendar(userId: string | null, view: string, date: string | null) {
+  loadCalendar(view: string, date: string | null) {
     this.loading = true;
     this.error = null;
 
-    this.calendarService.getCalendar(userId, view, date).subscribe({
+    this.calendarService.getCalendar(view, date).subscribe({
       next: (data) => {
         this.calendarData = data;
         this.isCoach = data.is_coach || false;
@@ -155,6 +149,10 @@ export class CalendarComponent implements OnInit {
       },
       error: (err) => {
         console.error('Calendar load error:', err);
+        if (err.status === 401) {
+          this.router.navigate(['/login'], { queryParams: { redirect: this.router.url } });
+          return;
+        }
         this.error = 'Ошибка загрузки календаря: ' + err.message;
         this.loading = false;
       }
@@ -401,9 +399,7 @@ export class CalendarComponent implements OnInit {
   showEventDetails(trainingId: number) {
     this.loadingTraining = true;
     this.showModal = true;
-    // user_id больше не передаем, используется initData из заголовков
-
-    this.calendarService.getTrainingDetails(trainingId, null).subscribe({
+    this.calendarService.getTrainingDetails(trainingId).subscribe({
       next: (data) => {
         this.selectedTraining = data;
         this.loadingTraining = false;
@@ -575,33 +571,9 @@ export class CalendarComponent implements OnInit {
     // Обновляем initData перед запросом (на случай, если он появился позже)
     this.calendarService.updateInitData();
     
-    // Проверяем наличие initData
-    const tg = (window as any).Telegram?.WebApp;
-    const hasInitData = tg && tg.initData && tg.initData.length > 0;
-    
-    console.log('🔍 Проверка перед регистрацией:', {
-      telegramWebAppAvailable: !!tg,
-      initDataAvailable: hasInitData,
-      initDataLength: tg?.initData?.length || 0,
-      platform: tg?.platform || 'unknown'
-    });
-    
-    if (!hasInitData) {
-      console.error('❌ initData пустой! Невозможно записаться без авторизации.');
-      console.error('💡 Убедитесь, что:');
-      console.error('   1. Страница открыта через Telegram WebApp (кнопка в боте)');
-      console.error('   2. URL использует HTTPS (не localhost)');
-      console.error('   3. Telegram WebApp инициализирован');
-      
-      alert('Ошибка: Необходимо войти в систему.\n\nПожалуйста, откройте календарь через Telegram бота (кнопка "📅 Открыть календарь").\n\nЕсли проблема сохраняется, убедитесь, что вы открыли страницу через WebApp, а не через обычный браузер.');
-      return;
-    }
-
     if (!confirm('Записаться на эту тренировку?')) return;
 
-    // Получаем user_id для fallback (если initData нет)
-    const userId = this.getUserId();
-    this.calendarService.registerForTraining(this.selectedTraining.training.id, userId || '').subscribe({
+    this.calendarService.registerForTraining(this.selectedTraining.training.id).subscribe({
       next: () => {
         alert('✅ Вы успешно записались на тренировку!');
         this.closeModal();
@@ -634,9 +606,7 @@ export class CalendarComponent implements OnInit {
 
     if (!confirm('Вы уверены, что хотите отменить запись?')) return;
 
-    // Получаем user_id для fallback (если initData нет)
-    const userId = this.getUserId();
-    this.calendarService.cancelRegistration(this.selectedTraining.training.id, userId || '').subscribe({
+    this.calendarService.cancelRegistration(this.selectedTraining.training.id).subscribe({
       next: () => {
         alert('✅ Запись отменена');
         this.closeModal();
@@ -662,11 +632,10 @@ export class CalendarComponent implements OnInit {
   }
 
   reloadCalendar() {
-    // user_id больше не передаем, используется initData из заголовков
     const dateStr = this.viewDate.toISOString().split('T')[0];
     const viewStr = this.view === CalendarView.Week ? 'week' : 
                    this.view === CalendarView.Day ? 'day' : 'month';
-    this.loadCalendar(null, viewStr, dateStr);
+    this.loadCalendar(viewStr, dateStr);
   }
 
   formatDate(dateStr: string): string {

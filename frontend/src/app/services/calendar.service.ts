@@ -95,60 +95,50 @@ export class CalendarService {
     return headers;
   }
 
+  private getRequestOptions(params?: HttpParams) {
+    return {
+      params,
+      headers: this.getHeaders(),
+      withCredentials: true
+    };
+  }
+
   getCalendar(
-    userId: string | null,
     view: string = 'month',
     date: string | null = null
   ): Observable<CalendarAPIResponse> {
     let params = new HttpParams();
-    // Если initData нет, используем fallback на user_id в query параметре (для обратной совместимости)
-    if (!this.initData && userId) {
-      params = params.set('user_id', userId);
-    }
     params = params.set('view', view);
     if (date) {
       params = params.set('date', date);
     }
 
-    return this.http.get<CalendarAPIResponse>(`${this.apiUrl}/calendar`, { 
-      params,
-      headers: this.getHeaders()
-    });
+    return this.http.get<CalendarAPIResponse>(`${this.apiUrl}/calendar`, this.getRequestOptions(params));
   }
 
-  getTrainingDetails(trainingId: number, userId: string | null): Observable<TrainingDetails> {
-    // user_id больше не передаем в URL для безопасности
-    // Используется initData из заголовков
-    return this.http.get<TrainingDetails>(`${this.apiUrl}/training/${trainingId}`, { 
-      headers: this.getHeaders()
-    });
+  getTrainingDetails(trainingId: number): Observable<TrainingDetails> {
+    return this.http.get<TrainingDetails>(`${this.apiUrl}/training/${trainingId}`, this.getRequestOptions());
   }
 
-  registerForTraining(trainingId: number, userId: string): Observable<any> {
+  registerForTraining(trainingId: number): Observable<any> {
     const formData = new FormData();
     formData.append('training_id', trainingId.toString());
-    // Если initData нет, используем fallback на user_id в форме (для обратной совместимости)
-    if (!this.initData && userId) {
-      formData.append('user_id', userId);
-    }
 
     return this.http.post(`${this.apiUrl}/register`, formData, { 
       responseType: 'text',
-      headers: this.getHeaders()
+      headers: this.getHeaders(),
+      withCredentials: true
     });
   }
 
-  cancelRegistration(trainingId: number, userId: string): Observable<any> {
+  cancelRegistration(trainingId: number): Observable<any> {
     const formData = new FormData();
     formData.append('training_id', trainingId.toString());
-    // Если initData нет, используем fallback на user_id в форме (для обратной совместимости)
-    if (!this.initData && userId) {
-      formData.append('user_id', userId);
-    }
 
     return this.http.post(`${this.apiUrl}/cancel`, formData, { 
       responseType: 'text',
-      headers: this.getHeaders()
+      headers: this.getHeaders(),
+      withCredentials: true
     });
   }
 
@@ -158,16 +148,39 @@ export class CalendarService {
     // user_id больше не передаем в URL для безопасности
     // Используется initData из заголовков
 
-    return this.http.get(`${this.apiUrl}/check-registration`, { 
-      params,
-      headers: this.getHeaders()
-    });
+    return this.http.get(`${this.apiUrl}/check-registration`, this.getRequestOptions(params));
   }
 
   // Получить userID через API используя initData
   getUserId(): Observable<{user_id: number}> {
     return this.http.post<{user_id: number}>(`${this.apiUrl}/auth`, null, {
-      headers: this.getHeaders()
+      headers: this.getHeaders(),
+      withCredentials: true
+    });
+  }
+
+  getAuthStatus(): Observable<any> {
+    return this.http.get(`${this.apiUrl}/auth/status`, this.getRequestOptions());
+  }
+
+  loginWithBrowserCredentials(username: string, password: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/browser-auth/login`, { username, password }, {
+      headers: this.getHeaders(),
+      withCredentials: true
+    });
+  }
+
+  logoutBrowserSession(): Observable<any> {
+    return this.http.post(`${this.apiUrl}/browser-auth/logout`, {}, {
+      headers: this.getHeaders(),
+      withCredentials: true
+    });
+  }
+
+  setBrowserPassword(password: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/browser-auth/set-password`, { password }, {
+      headers: this.getHeaders(),
+      withCredentials: true
     });
   }
 
@@ -177,44 +190,32 @@ export class CalendarService {
       training_id: trainingId,
       student_ids: studentIds
     };
-    return this.http.post(`${this.apiUrl}/mark-attendance`, body, {
-      headers: this.getHeaders()
-    });
+    return this.http.post(`${this.apiUrl}/mark-attendance`, body, this.getRequestOptions());
   }
 
   // Получить список записей ученика на тренировки
   getMyRegistrations(): Observable<MyRegistrationsResponse> {
-    return this.http.get<MyRegistrationsResponse>(`${this.apiUrl}/my-registrations`, {
-      headers: this.getHeaders()
-    });
+    return this.http.get<MyRegistrationsResponse>(`${this.apiUrl}/my-registrations`, this.getRequestOptions());
   }
 
   // Получить информацию об абонементе ученика
   getMySubscription(): Observable<MySubscriptionResponse> {
-    return this.http.get<MySubscriptionResponse>(`${this.apiUrl}/my-subscription`, {
-      headers: this.getHeaders()
-    });
+    return this.http.get<MySubscriptionResponse>(`${this.apiUrl}/my-subscription`, this.getRequestOptions());
   }
 
   // Получить профиль ученика
   getMyProfile(): Observable<MyProfileResponse> {
-    return this.http.get<MyProfileResponse>(`${this.apiUrl}/my-profile`, {
-      headers: this.getHeaders()
-    });
+    return this.http.get<MyProfileResponse>(`${this.apiUrl}/my-profile`, this.getRequestOptions());
   }
 
   // Получить все абонементы всех учеников (для тренеров)
   getAllStudentsSubscriptions(): Observable<AllStudentsSubscriptionsResponse> {
-    return this.http.get<AllStudentsSubscriptionsResponse>(`${this.apiUrl}/students-subscriptions`, {
-      headers: this.getHeaders()
-    });
+    return this.http.get<AllStudentsSubscriptionsResponse>(`${this.apiUrl}/students-subscriptions`, this.getRequestOptions());
   }
 
   // Обновить профиль пользователя
   updateProfile(data: UpdateProfileRequest): Observable<MyProfileResponse> {
-    return this.http.put<MyProfileResponse>(`${this.apiUrl}/update-profile`, data, {
-      headers: this.getHeaders()
-    });
+    return this.http.put<MyProfileResponse>(`${this.apiUrl}/update-profile`, data, this.getRequestOptions());
   }
 
   // Добавить занятия к абонементу (для тренеров)
@@ -222,9 +223,7 @@ export class CalendarService {
     return this.http.post<Subscription>(`${this.apiUrl}/subscription/add-lessons`, {
       subscription_id: subscriptionId,
       count: count
-    }, {
-      headers: this.getHeaders()
-    });
+    }, this.getRequestOptions());
   }
 
   // Снять занятия с абонемента (для тренеров)
@@ -232,8 +231,6 @@ export class CalendarService {
     return this.http.post<Subscription>(`${this.apiUrl}/subscription/remove-lessons`, {
       subscription_id: subscriptionId,
       count: count
-    }, {
-      headers: this.getHeaders()
-    });
+    }, this.getRequestOptions());
   }
 }

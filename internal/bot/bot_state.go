@@ -43,6 +43,7 @@ const (
 	StateConfirmingDeletion      // Новое состояние для подтверждения удаления
 
 	// Состояния для записи на тренировку - удалены, функционал перенесен в WebApp
+	StateSettingBrowserPassword
 )
 
 type UserSession struct {

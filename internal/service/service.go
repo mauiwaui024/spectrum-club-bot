@@ -16,6 +16,9 @@ type UserService interface {
 	GetByID(id int64) (*models.User, error)
 
 	GetByTelegramID(telegramID int64) (*models.User, error)
+	GetByUsername(username string) (*models.User, error)
+	SetBrowserPassword(userID int64, plainPassword string) error
+	VerifyBrowserPassword(user *models.User, plainPassword string) bool
 }
 
 type StudentService interface {

@@ -20,6 +20,7 @@ func createMainKeyboard(role string) tgbotapi.ReplyKeyboardMarkup {
 			),
 			tgbotapi.NewKeyboardButtonRow(
 				tgbotapi.NewKeyboardButton("📅 Календарь"),
+				tgbotapi.NewKeyboardButton("🔐 Задать пароль"),
 			),
 		)
 	}
@@ -32,6 +33,7 @@ func createStudentMainKeyboard() tgbotapi.ReplyKeyboardMarkup {
 	return tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButtonRow(
 			tgbotapi.NewKeyboardButton("📅 Календарь"),
+			tgbotapi.NewKeyboardButton("🔐 Задать пароль"),
 		),
 	)
 }

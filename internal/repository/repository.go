@@ -8,7 +8,9 @@ import (
 type UserRepository interface {
 	CreateOrUpdate(user *models.User) error
 	GetByTelegramID(telegramID int64) (*models.User, error)
+	GetByUsername(username string) (*models.User, error)
 	GetByID(id int64) (*models.User, error)
+	SetPasswordHash(userID int64, passwordHash string) error
 	UpdateRole(telegramID int64, role string) error
 	UpdateUser(userID int64, firstName, lastName *string) error
 

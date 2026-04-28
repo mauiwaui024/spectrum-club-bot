@@ -99,6 +99,9 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) {
 		case StateConfirmingDeletion:
 			b.handleDeletionConfirmation(chatID, message.Text)
 			return
+		case StateSettingBrowserPassword:
+			b.handleBrowserPasswordInput(chatID, user, message.Text)
+			return
 			// Состояния для записи на тренировку - удалены, функционал перенесен в WebApp
 		}
 	}
@@ -169,6 +172,8 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) {
 		b.showAllStudens(message.Chat.ID, user)
 	case "📅 Календарь":
 		b.handleCalendarCommand(message)
+	case "🔐 Задать пароль":
+		b.startBrowserPasswordFlow(chatID, user)
 	case "📅 Управление расписанием":
 		b.showScheduleManagementMenu(message.Chat.ID, user)
 	case "💳 Управление абонементами":
