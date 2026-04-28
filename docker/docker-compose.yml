@@ -18,6 +18,9 @@ services:
       LOG_LEVEL: ${LOG_LEVEL}
       BASE_URL: ${BASE_URL}
       HTTP_PORT: 8080
+      HTTPS_PROXY: ${HTTPS_PROXY:-}
+      HTTP_PROXY: ${HTTP_PROXY:-}
+      NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,postgres-db-spectrum,postgres-db-spectrum:5432}
     restart: unless-stopped
     networks:
       - postgres-db_postgres-net  # Подключаем к той же сети

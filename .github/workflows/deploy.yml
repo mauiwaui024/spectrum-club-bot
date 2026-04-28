@@ -59,6 +59,9 @@ jobs:
         ENVIRONMENT=${{ secrets.ENVIRONMENT }}
         BASE_URL=${{ secrets.BASE_URL }}
         IMAGE_TAG=${{ github.sha }}
+        HTTPS_PROXY=${{ secrets.HTTPS_PROXY }}
+        HTTP_PROXY=${{ secrets.HTTP_PROXY }}
+        NO_PROXY=${{ secrets.NO_PROXY }}
         EOF
         
         echo "✅ .env file created"
