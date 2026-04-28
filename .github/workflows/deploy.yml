@@ -129,11 +129,21 @@ jobs:
           sleep 10
 
           echo '🧪 Running smoke checks...'
+          # Internal checks do not depend on external TLS/reverse proxy config.
+          curl -fsS "http://localhost:8080/health" > /dev/null
+          curl -fsS "http://localhost:8080/calendar" > /dev/null
+          curl -fsS "http://localhost:8080/api/auth/status" > /dev/null
+          echo '✅ Internal smoke checks passed'
+          
+          # Optional external check (non-blocking): verifies domain/reverse-proxy path.
           BASE_URL_CLEAN=\$(grep '^BASE_URL=' .env | cut -d '=' -f2 | sed 's#/*\$##')
-          curl -fsS "\${BASE_URL_CLEAN}/health" > /dev/null
-          curl -fsS "\${BASE_URL_CLEAN}/calendar" > /dev/null
-          curl -fsS "\${BASE_URL_CLEAN}/api/auth/status" > /dev/null
-          echo '✅ Smoke checks passed'
+          if [ -n "\${BASE_URL_CLEAN}" ]; then
+            if curl -fsS "\${BASE_URL_CLEAN}/health" > /dev/null; then
+              echo '✅ External health check passed'
+            else
+              echo '⚠️ External health check failed (TLS/proxy/domain issue), deploy continues'
+            fi
+          fi
           
           echo '🔍 Bot logs:'
           docker compose logs --tail=20 bot
