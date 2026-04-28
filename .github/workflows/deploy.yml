@@ -68,6 +68,23 @@ jobs:
         echo "📄 .env content (keys only):"
         cat .env | sed 's/=.*/=[HIDDEN]/'
 
+    - name: ✅ Validate BASE_URL format
+      run: |
+        BASE_URL_RAW="${{ secrets.BASE_URL }}"
+        if [ -z "$BASE_URL_RAW" ]; then
+          echo "❌ BASE_URL secret is empty"
+          exit 1
+        fi
+
+        # Must be scheme + host only (optional trailing slash), without path/query/fragment.
+        if [[ ! "$BASE_URL_RAW" =~ ^https?://[^/]+/?$ ]]; then
+          echo "❌ BASE_URL must be domain-only URL (example: https://spectrumbot.ru)"
+          echo "Current value has an extra path or invalid format."
+          exit 1
+        fi
+
+        echo "✅ BASE_URL format is valid"
+
     - name: 📦 Copy files to server
       run: |
         scp -o StrictHostKeyChecking=no \
@@ -110,6 +127,13 @@ jobs:
           
           echo '⏳ Waiting for bot to start...'
           sleep 10
+
+          echo '🧪 Running smoke checks...'
+          BASE_URL_CLEAN=\$(grep '^BASE_URL=' .env | cut -d '=' -f2 | sed 's#/*\$##')
+          curl -fsS "\${BASE_URL_CLEAN}/health" > /dev/null
+          curl -fsS "\${BASE_URL_CLEAN}/calendar" > /dev/null
+          curl -fsS "\${BASE_URL_CLEAN}/api/auth/status" > /dev/null
+          echo '✅ Smoke checks passed'
           
           echo '🔍 Bot logs:'
           docker compose logs --tail=20 bot

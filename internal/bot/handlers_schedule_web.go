@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 )
@@ -41,7 +43,7 @@ func (b *Bot) handleCalendarCommand(message *tgbotapi.Message) {
 	}
 	fmt.Println(userID)
 	// Формируем URL без user_id (будет использоваться initData из Telegram WebApp)
-	url := fmt.Sprintf("%s/calendar", b.webBaseURL)
+	calendarURL := buildCalendarURL(b.webBaseURL)
 
 	// Создаем WebApp кнопку для передачи initData
 	// ВАЖНО: Для работы WebApp нужен HTTPS URL (не localhost)!
@@ -54,7 +56,7 @@ func (b *Bot) handleCalendarCommand(message *tgbotapi.Message) {
 				{
 					Text: "📅 Открыть календарь",
 					WebApp: &WebAppInfo{
-						URL: url,
+						URL: calendarURL,
 					},
 				},
 			},
@@ -64,7 +66,7 @@ func (b *Bot) handleCalendarCommand(message *tgbotapi.Message) {
 	// Создаем структуру для отправки сообщения с WebApp кнопкой
 	requestData := map[string]interface{}{
 		"chat_id":      chatID,
-		"text":         "Нажмите кнопку ниже, чтобы открыть календарь тренировок:\n\n<i>Если кнопка не работает, откройте ссылку в браузере:</i>\n<code>" + url + "</code>",
+		"text":         "Нажмите кнопку ниже, чтобы открыть календарь тренировок:\n\n<i>Если кнопка не работает, откройте ссылку в браузере:</i>\n<code>" + calendarURL + "</code>",
 		"parse_mode":   "HTML",
 		"reply_markup": webAppMarkup,
 	}
@@ -76,7 +78,7 @@ func (b *Bot) handleCalendarCommand(message *tgbotapi.Message) {
 			tgbotapi.NewInlineKeyboardRow(
 				tgbotapi.NewInlineKeyboardButtonURL(
 					"📅 Открыть календарь",
-					url,
+					calendarURL,
 				),
 			),
 		)
@@ -95,7 +97,7 @@ func (b *Bot) handleCalendarCommand(message *tgbotapi.Message) {
 			tgbotapi.NewInlineKeyboardRow(
 				tgbotapi.NewInlineKeyboardButtonURL(
 					"📅 Открыть календарь",
-					url,
+					calendarURL,
 				),
 			),
 		)
@@ -116,7 +118,7 @@ func (b *Bot) handleCalendarCommand(message *tgbotapi.Message) {
 			tgbotapi.NewInlineKeyboardRow(
 				tgbotapi.NewInlineKeyboardButtonURL(
 					"📅 Открыть календарь",
-					url,
+					calendarURL,
 				),
 			),
 		)
@@ -125,4 +127,24 @@ func (b *Bot) handleCalendarCommand(message *tgbotapi.Message) {
 		b.api.Send(msg)
 		return
 	}
+}
+
+func buildCalendarURL(baseURL string) string {
+	trimmed := strings.TrimSpace(baseURL)
+	if trimmed == "" {
+		return "/calendar"
+	}
+
+	parsed, err := url.Parse(trimmed)
+	if err != nil {
+		return strings.TrimRight(trimmed, "/") + "/calendar"
+	}
+
+	parsed.Path = strings.TrimRight(parsed.Path, "/")
+	if parsed.Path == "/calendar" {
+		return parsed.String()
+	}
+	parsed.Path = parsed.Path + "/calendar"
+
+	return parsed.String()
 }

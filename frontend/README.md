@@ -57,3 +57,16 @@ src/
 - `POST /api/register` - запись на тренировку
 - `POST /api/cancel` - отмена записи
 - `GET /api/check-registration` - проверка статуса записи
+
+## Production Reverse Proxy Requirements
+
+Frontend is built with `base href="/"`, so reverse proxy must forward both SPA routes and root static assets to the Go app.
+
+Required routes:
+- `/calendar`
+- `/api/`
+- `/` and static assets from root (`/main.*.js`, `/styles.*.css`, etc.)
+
+Also ensure:
+- `BASE_URL` is domain-only (for example `https://spectrumbot.ru`) without `/calendar` suffix.
+- No early `try_files ... =404` for SPA paths before proxying to Go backend.
