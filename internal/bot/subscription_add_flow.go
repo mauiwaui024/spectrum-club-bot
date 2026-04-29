@@ -338,32 +338,34 @@ func (b *Bot) resetSession(chatID int64) {
 }
 
 func (b *Bot) cancelOperation(chatID int64, user *models.User) {
-	msg := tgbotapi.NewMessage(chatID, "❌ Операция отменена")
 	if user != nil {
-		msg.ReplyMarkup = createMainKeyboard(user.Role)
-	} else {
-		// Если пользователь не передан, получаем его
-		userProfile, _, _, _, err := b.UserService.GetUserProfile(chatID)
-		if err == nil && userProfile != nil {
-			msg.ReplyMarkup = createMainKeyboard(userProfile.Role)
-		} else {
-			msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
-		}
+		b.sendMainMenuWithRefresh(chatID, user, "❌ Операция отменена")
+		b.resetSession(chatID)
+		return
 	}
-	b.api.Send(msg)
+
+	// Если пользователь не передан, получаем его
+	userProfile, _, _, _, err := b.UserService.GetUserProfile(chatID)
+	if err == nil && userProfile != nil {
+		b.sendMainMenuWithRefresh(chatID, userProfile, "❌ Операция отменена")
+	} else {
+		msg := tgbotapi.NewMessage(chatID, "❌ Операция отменена")
+		msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
+		b.api.Send(msg)
+	}
 	b.resetSession(chatID)
 }
 
 // showMainKeyboardAfterOperation показывает главную клавиатуру после завершения операции
 func (b *Bot) showMainKeyboardAfterOperation(chatID int64, message string) {
 	user, _, _, _, err := b.UserService.GetUserProfile(chatID)
-	msg := tgbotapi.NewMessage(chatID, message)
 	if err == nil && user != nil {
-		msg.ReplyMarkup = createMainKeyboard(user.Role)
+		b.sendMainMenuWithRefresh(chatID, user, message)
 	} else {
+		msg := tgbotapi.NewMessage(chatID, message)
 		msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
+		b.api.Send(msg)
 	}
-	b.api.Send(msg)
 }
 
 func (b *Bot) sendError(chatID int64, text string) {

@@ -254,9 +254,7 @@ func (b *Bot) handleNewStudentCommand(chatID int64, user *models.User) {
 
 func (b *Bot) handleStartCommand(chatID int64, user *models.User) {
 	text := "Введите правильную команду"
-	msg := tgbotapi.NewMessage(chatID, text)
-	msg.ReplyMarkup = createMainKeyboard(user.Role)
-	b.api.Send(msg)
+	b.sendMainMenuWithRefresh(chatID, user, text)
 }
 
 func (b *Bot) handleCoachCommand(chatID int64, user *models.User) {
@@ -269,10 +267,7 @@ func (b *Bot) handleCoachCommand(chatID int64, user *models.User) {
 		return
 	}
 	user.Role = "coach"
-
-	msg := tgbotapi.NewMessage(chatID, "✅ Теперь вы зарегистрированы как тренер!")
-	msg.ReplyMarkup = createMainKeyboard(user.Role)
-	b.api.Send(msg)
+	b.sendMainMenuWithRefresh(chatID, user, "✅ Теперь вы зарегистрированы как тренер!")
 }
 
 func (b *Bot) sendWelcomeMessage(chatID int64, user *models.User) {
@@ -299,6 +294,15 @@ func (b *Bot) sendWelcomeMessage(chatID int64, user *models.User) {
 • 🎫 Просматривать информацию об абонементе
 • 👤 Просматривать свой профиль`
 	}
+
+	b.sendMainMenuWithRefresh(chatID, user, text)
+}
+
+func (b *Bot) sendMainMenuWithRefresh(chatID int64, user *models.User, text string) {
+	// Force Telegram clients to drop stale keyboard cache first.
+	remove := tgbotapi.NewMessage(chatID, " ")
+	remove.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
+	b.api.Send(remove)
 
 	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ReplyMarkup = createMainKeyboard(user.Role)
