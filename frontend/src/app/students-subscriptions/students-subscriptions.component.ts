@@ -120,8 +120,8 @@ export class StudentsSubscriptionsComponent implements OnInit {
   }
 
   getMaxRemovableLessons(sub: Subscription): number {
-    // Вручную снимаем только реально доступные занятия (не уходим в долг).
-    return Math.max(0, sub.remaining_lessons);
+    // Разрешаем ручное снятие до порога -2 включительно.
+    return Math.max(0, sub.remaining_lessons + 2);
   }
 
   getMaxAddableLessons(sub: Subscription): number {

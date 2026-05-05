@@ -228,9 +228,13 @@ func (s *subscriptionService) RemoveLessons(subscriptionID int64, count int) err
 		return fmt.Errorf("абонемент с ID %d не найден", subscriptionID)
 	}
 
-	// Проверяем, что достаточно занятий для снятия
-	if count > subscription.RemainingLessons {
-		return fmt.Errorf("недостаточно занятий для снятия. Доступно: %d", subscription.RemainingLessons)
+	// Разрешаем ручное снятие до порога -2 включительно.
+	maxRemovable := subscription.RemainingLessons + 2
+	if maxRemovable < 0 {
+		maxRemovable = 0
+	}
+	if count > maxRemovable {
+		return fmt.Errorf("недостаточно занятий для снятия. Можно снять максимум: %d", maxRemovable)
 	}
 
 	return s.subscriptionRepo.RemoveLessons(subscriptionID, count)

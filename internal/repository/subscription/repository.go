@@ -131,7 +131,7 @@ func (r *subscriptionRepository) GetActiveByStudentID(studentID int64) (*models.
 	query := `
 		SELECT * FROM spectrum.subscriptions 
 		WHERE student_id = $1 
-		AND remaining_lessons >=-2
+		AND remaining_lessons > -2
 		AND (end_date IS NULL OR end_date > CURRENT_TIMESTAMP)
 		ORDER BY created_at DESC 
 		LIMIT 1`

@@ -107,7 +107,7 @@
                       </button>
                     </div>
                     <div class="form-hint" *ngIf="getMaxRemovableLessons(sub) > 0">
-                      Доступно: {{ getMaxRemovableLessons(sub) }} занятий
+                      Можно снять: {{ getMaxRemovableLessons(sub) }} занятий (до порога -2)
                     </div>
                     <div class="form-hint form-hint-warning" *ngIf="getMaxRemovableLessons(sub) === 0 && sub.remaining_lessons >= -2">
                       Доступных занятий для снятия нет (баланс на пороге перерасхода)

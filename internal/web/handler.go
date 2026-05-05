@@ -882,7 +882,7 @@ func (h *Handler) RegisterForTraining(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if activeSubscription.RemainingLessons < -2 {
+	if activeSubscription.RemainingLessons <= -2 {
 		http.Error(w, "Пополните абонемент. Для записи на тренировку необходим активный абонемент с оставшимися занятиями.", http.StatusBadRequest)
 		return
 	}
