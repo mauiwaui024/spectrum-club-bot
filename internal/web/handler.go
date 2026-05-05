@@ -882,7 +882,7 @@ func (h *Handler) RegisterForTraining(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if activeSubscription.RemainingLessons <= 0 {
+	if activeSubscription.RemainingLessons < -2 {
 		http.Error(w, "Пополните абонемент. Для записи на тренировку необходим активный абонемент с оставшимися занятиями.", http.StatusBadRequest)
 		return
 	}
@@ -1646,11 +1646,11 @@ func (h *Handler) MySubscriptionAPI(w http.ResponseWriter, r *http.Request) {
 			"created_at":        subscription.CreatedAt.Format("2006-01-02"),
 		}
 
-		if subscription.RemainingLessons > 0 && subscription.EndDate.After(now) {
+		if subscription.RemainingLessons >= -2 && subscription.EndDate.After(now) {
 			activeSubscriptions = append(activeSubscriptions, subData)
 		} else {
 			status := "used"
-			if subscription.RemainingLessons > 0 && subscription.EndDate.Before(now) {
+			if subscription.EndDate.Before(now) || subscription.EndDate.Equal(now) {
 				status = "expired"
 			}
 			subData["status"] = status
@@ -1946,15 +1946,14 @@ func (h *Handler) AllStudentsSubscriptionsAPI(w http.ResponseWriter, r *http.Req
 			}
 
 			// Определяем статус
-			// Активен только если remaining_lessons > 0 AND end_date > now
+			// Активен при remaining_lessons >= -2 и end_date > now
 			var status string
-			if subscription.RemainingLessons == 0 {
-				status = "used"
-			} else if subscription.EndDate.Before(now) || subscription.EndDate.Equal(now) {
+			if subscription.EndDate.Before(now) || subscription.EndDate.Equal(now) {
 				status = "expired"
-			} else {
-				// remaining_lessons > 0 AND end_date > now
+			} else if subscription.RemainingLessons >= -2 {
 				status = "active"
+			} else {
+				status = "used"
 			}
 			subData["status"] = status
 
@@ -1963,14 +1962,19 @@ func (h *Handler) AllStudentsSubscriptionsAPI(w http.ResponseWriter, r *http.Req
 
 		// Подсчитываем общее количество занятий из активных абонементов
 		totalLessonsCount := 0
+		hasActiveSubscription := false
 		for _, subscription := range subscriptions {
-			if subscription.RemainingLessons > 0 && subscription.EndDate.After(now) {
-				totalLessonsCount += subscription.RemainingLessons
+			if subscription.RemainingLessons >= -2 && subscription.EndDate.After(now) {
+				hasActiveSubscription = true
+				// Для счетчика не показываем отрицательные "доступные занятия".
+				if subscription.RemainingLessons > 0 {
+					totalLessonsCount += subscription.RemainingLessons
+				}
 			}
 		}
 
 		// Добавляем студента в список только если у него есть активные абонементы
-		if totalLessonsCount > 0 {
+		if hasActiveSubscription {
 			studentData := map[string]interface{}{
 				"user_id":             studentUser.ID,
 				"student_id":          student.ID,
@@ -2055,12 +2059,12 @@ func (h *Handler) AddLessonsAPI(w http.ResponseWriter, r *http.Request) {
 			if sub.ID == requestData.SubscriptionID {
 				// Определяем статус
 				var status string
-				if sub.RemainingLessons == 0 {
-					status = "used"
-				} else if sub.EndDate.Before(now) || sub.EndDate.Equal(now) {
+				if sub.EndDate.Before(now) || sub.EndDate.Equal(now) {
 					status = "expired"
-				} else {
+				} else if sub.RemainingLessons >= -2 {
 					status = "active"
+				} else {
+					status = "used"
 				}
 
 				response := map[string]interface{}{
@@ -2143,12 +2147,12 @@ func (h *Handler) RemoveLessonsAPI(w http.ResponseWriter, r *http.Request) {
 			if sub.ID == requestData.SubscriptionID {
 				// Определяем статус
 				var status string
-				if sub.RemainingLessons == 0 {
-					status = "used"
-				} else if sub.EndDate.Before(now) || sub.EndDate.Equal(now) {
+				if sub.EndDate.Before(now) || sub.EndDate.Equal(now) {
 					status = "expired"
-				} else {
+				} else if sub.RemainingLessons >= -2 {
 					status = "active"
+				} else {
+					status = "used"
 				}
 
 				response := map[string]interface{}{

@@ -33,6 +33,9 @@
                 <span class="count-large">{{ sub.remaining_lessons }}</span>
                 <span class="count-label">из {{ sub.total_lessons }} занятий</span>
               </div>
+              <div class="count-label" *ngIf="sub.remaining_lessons < 0">
+                Перерасход в рамках допустимого лимита
+              </div>
               <div class="progress-bar">
                 <div class="progress-fill" [style.width.%]="getProgressPercentage(sub)"></div>
               </div>

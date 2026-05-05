@@ -131,7 +131,7 @@ func (r *subscriptionRepository) GetActiveByStudentID(studentID int64) (*models.
 	query := `
 		SELECT * FROM spectrum.subscriptions 
 		WHERE student_id = $1 
-		AND remaining_lessons > 0 
+		AND remaining_lessons >=-2
 		AND (end_date IS NULL OR end_date > CURRENT_TIMESTAMP)
 		ORDER BY created_at DESC 
 		LIMIT 1`
@@ -169,18 +169,34 @@ func (r *subscriptionRepository) DecrementRemainingLessons(studentID int64) erro
 	if err != nil {
 		return fmt.Errorf("нет активного абонемента для ученика с ID %d: %v", studentID, err)
 	}
-	
+
 	if subscription == nil {
 		return fmt.Errorf("нет активного абонемента для ученика с ID %d", studentID)
 	}
-	
-	// Обновляем remaining_lessons
-	subscription.RemainingLessons--
-	if subscription.RemainingLessons < 0 {
-		subscription.RemainingLessons = 0
+
+	query := `
+		UPDATE spectrum.subscriptions
+		SET remaining_lessons = GREATEST(-2, remaining_lessons - 1),
+		updated_at = CURRENT_TIMESTAMP
+		WHERE id = $1
+	`
+	result, err := r.db.Exec(
+		query,
+		subscription.ID,
+	)
+	if err != nil {
+		return err
 	}
-	
-	return r.Update(subscription)
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("ошибка получения количества обновленных строк: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("не найдена запись с id=%d для обновления", subscription.ID)
+	}
+	return nil
 }
 
 // AddLessons добавляет занятия к абонементу
@@ -221,7 +237,7 @@ func (r *subscriptionRepository) RemoveLessons(subscriptionID int64, count int) 
 
 	query := `
 		UPDATE spectrum.subscriptions
-		SET remaining_lessons = GREATEST(0, remaining_lessons - $1),
+		SET remaining_lessons = GREATEST(-2, remaining_lessons - $1),
 		    updated_at = CURRENT_TIMESTAMP
 		WHERE id = $2
 	`

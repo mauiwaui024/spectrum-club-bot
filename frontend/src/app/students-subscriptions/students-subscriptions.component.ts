@@ -116,7 +116,12 @@ export class StudentsSubscriptionsComponent implements OnInit {
       return student.total_lessons_count;
     }
     // Fallback: подсчитываем из активных абонементов
-    return this.getActiveSubscriptions(student).reduce((sum, sub) => sum + sub.remaining_lessons, 0);
+    return this.getActiveSubscriptions(student).reduce((sum, sub) => sum + Math.max(sub.remaining_lessons, 0), 0);
+  }
+
+  getMaxRemovableLessons(sub: Subscription): number {
+    // Вручную снимаем только реально доступные занятия (не уходим в долг).
+    return Math.max(0, sub.remaining_lessons);
   }
 
   getMaxAddableLessons(sub: Subscription): number {
@@ -269,8 +274,9 @@ export class StudentsSubscriptionsComponent implements OnInit {
     }
 
     // Валидация: проверяем, что достаточно занятий для снятия
-    if (this.removeLessonsCount > subscription.remaining_lessons) {
-      this.editError = `Недостаточно занятий. Доступно: ${subscription.remaining_lessons}`;
+    const maxRemovable = this.getMaxRemovableLessons(subscription);
+    if (this.removeLessonsCount > maxRemovable) {
+      this.editError = `Недостаточно занятий. Доступно: ${maxRemovable}`;
       return;
     }
 

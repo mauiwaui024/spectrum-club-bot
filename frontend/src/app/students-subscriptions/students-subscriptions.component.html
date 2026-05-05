@@ -100,17 +100,20 @@
                   <div class="form-group">
                     <label>Снять занятия:</label>
                     <div class="input-group">
-                      <input type="number" [(ngModel)]="removeLessonsCount" min="1" [max]="sub.remaining_lessons" class="form-input" placeholder="Количество">
+                      <input type="number" [(ngModel)]="removeLessonsCount" min="1" [max]="getMaxRemovableLessons(sub)" class="form-input" placeholder="Количество">
                       <button class="btn btn-secondary" (click)="removeLessons(sub)" [disabled]="saving">
                         <span *ngIf="!saving">Снять</span>
                         <span *ngIf="saving">Сохранение...</span>
                       </button>
                     </div>
-                    <div class="form-hint" *ngIf="sub.remaining_lessons > 0">
-                      Доступно: {{ sub.remaining_lessons }} занятий
+                    <div class="form-hint" *ngIf="getMaxRemovableLessons(sub) > 0">
+                      Доступно: {{ getMaxRemovableLessons(sub) }} занятий
                     </div>
-                    <div class="form-hint form-hint-warning" *ngIf="sub.remaining_lessons === 0">
-                      Нет доступных занятий для снятия
+                    <div class="form-hint form-hint-warning" *ngIf="getMaxRemovableLessons(sub) === 0 && sub.remaining_lessons >= -2">
+                      Доступных занятий для снятия нет (баланс на пороге перерасхода)
+                    </div>
+                    <div class="form-hint form-hint-warning" *ngIf="sub.remaining_lessons < -2">
+                      Баланс ниже допустимого порога, требуется пополнение
                     </div>
                   </div>
                   <div class="form-actions">
