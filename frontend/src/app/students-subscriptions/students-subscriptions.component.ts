@@ -276,7 +276,11 @@ export class StudentsSubscriptionsComponent implements OnInit {
     // Валидация: проверяем, что достаточно занятий для снятия
     const maxRemovable = this.getMaxRemovableLessons(subscription);
     if (this.removeLessonsCount > maxRemovable) {
-      this.editError = `Недостаточно занятий. Доступно: ${maxRemovable}`;
+      if (maxRemovable === 0) {
+        this.editError = 'Снятие недоступно при текущем балансе (достигнут порог -2)';
+      } else {
+        this.editError = `Можно снять максимум: ${maxRemovable}`;
+      }
       return;
     }
 

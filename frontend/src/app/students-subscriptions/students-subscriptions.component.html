@@ -106,14 +106,11 @@
                         <span *ngIf="saving">Сохранение...</span>
                       </button>
                     </div>
-                    <div class="form-hint" *ngIf="getMaxRemovableLessons(sub) > 0">
-                      Можно снять: {{ getMaxRemovableLessons(sub) }} занятий (до порога -2)
+                    <div class="form-hint">
+                      Текущий баланс: {{ sub.remaining_lessons }}
                     </div>
-                    <div class="form-hint form-hint-warning" *ngIf="getMaxRemovableLessons(sub) === 0 && sub.remaining_lessons >= -2">
-                      Доступных занятий для снятия нет (баланс на пороге перерасхода)
-                    </div>
-                    <div class="form-hint form-hint-warning" *ngIf="sub.remaining_lessons < -2">
-                      Баланс ниже допустимого порога, требуется пополнение
+                    <div class="form-hint form-hint-warning" *ngIf="sub.remaining_lessons <= -2">
+                      Снятие недоступно: достигнут порог -2
                     </div>
                   </div>
                   <div class="form-actions">
