@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"spectrum-club-bot/internal/models"
 	"strconv"
+	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 )
@@ -22,7 +23,11 @@ func (b *Bot) getOrCreateSession(chatID int64) *UserSession {
 }
 
 func (b *Bot) handleAddSubscription(chatID int64) {
-	// ... существующий код до показа учеников ...
+	user, _, _, _, err := b.UserService.GetUserProfile(chatID)
+	if err != nil || user == nil || user.Role != "coach" {
+		b.sendError(chatID, "❌ Эта функция доступна только тренерам")
+		return
+	}
 
 	students, err := b.UserService.GetAllStudents()
 	if err != nil {
@@ -32,32 +37,29 @@ func (b *Bot) handleAddSubscription(chatID int64) {
 
 	if len(students) == 0 {
 		msg := tgbotapi.NewMessage(chatID, "📭 Список учеников пуст")
-		b.api.Send(msg)
+		b.sendTelegram(msg)
 		return
 	}
 
-	// Сохраняем учеников в сессии
+	if err := b.showStudentsForSelection(chatID, students); err != nil {
+		b.sendError(chatID, "❌ Не удалось показать список учеников")
+		return
+	}
+
 	session := b.getOrCreateSession(chatID)
 	session.State = StateSelectingStudent
 	session.StudentsForSelection = students
-
-	// Показываем список учеников
-	b.showStudentsForSelection(chatID, students)
 }
-func (b *Bot) showStudentsForSelection(chatID int64, students []*models.User) {
-	// Формируем сообщение со списком учеников
-	msgText := "👥 *Выберите ученика:*\n\n"
+
+func (b *Bot) showStudentsForSelection(chatID int64, students []*models.User) error {
+	msgText := "Выберите ученика:\n\n"
 	for i, student := range students {
 		displayName := getStudentDisplayName(student)
 		msgText += fmt.Sprintf("%d. %s\n", i+1, displayName)
 	}
-	msgText += "\nВведите номер ученика или отправьте '❌ Отмена'"
+	msgText += "\nВведите номер ученика или нажмите «❌ Отмена»"
 
-	msg := tgbotapi.NewMessage(chatID, msgText)
-	msg.ParseMode = "Markdown"
-	msg.ReplyMarkup = createCancelKeyboard()
-
-	b.api.Send(msg)
+	return b.sendLongPlain(chatID, msgText, createCancelKeyboard())
 }
 
 // Вспомогательная функция для получения отображаемого имени ученика
@@ -72,89 +74,13 @@ func getStudentDisplayName(student *models.User) string {
 	return "Неизвестный ученик"
 }
 
-// func (b *Bot) handleAddSubscription(chatID int64) {
-// 	user, _, _, _, err := b.UserService.GetUserProfile(chatID)
-// 	if err != nil {
-// 		b.sendError(chatID, "❌ Ошибка проверки прав доступа")
-// 		return
-// 	}
-
-// 	if user.Role != "coach" {
-// 		b.sendError(chatID, "❌ Эта функция доступна только тренерам")
-// 		return
-// 	}
-// 	session := b.getOrCreateSession(chatID)
-// 	session.State = StateSelectingStudent
-
-// 	students, err := b.UserService.GetAllStudents()
-// 	if err != nil {
-// 		msg := tgbotapi.NewMessage(chatID, "❌ Ошибка при получении списка учеников")
-// 		b.api.Send(msg)
-// 		b.resetSession(chatID)
-// 		return
-// 	}
-
-// 	if len(students) == 0 {
-// 		msg := tgbotapi.NewMessage(chatID, "📝 Нет доступных учеников")
-// 		b.api.Send(msg)
-// 		b.resetSession(chatID)
-// 		return
-// 	}
-
-// 	// Создаем клавиатуру со списком учеников
-// 	msg := tgbotapi.NewMessage(chatID, "👥 Выберите ученика:")
-// 	keyboard := b.createStudentsKeyboard(students)
-// 	msg.ReplyMarkup = keyboard
-// 	b.api.Send(msg)
-// }
-
-// ///обработка выбора ученика
-// func (b *Bot) handleStudentSelection(chatID int64, messageText string) {
-// 	session := b.getOrCreateSession(chatID)
-// 	if session.State != StateSelectingStudent {
-// 		return
-// 	}
-
-// 	if messageText == "❌ Отмена" {
-// 		b.cancelOperation(chatID, nil)
-// 		return
-// 	}
-
-// 	// Ищем ученика по имени (упрощенная логика)
-// 	students, err := b.UserService.GetAllStudents()
-// 	if err != nil {
-// 		b.sendError(chatID, "Ошибка при поиске ученика")
-// 		return
-// 	}
-
-// 	var selectedStudent *models.User
-// 	for _, student := range students {
-// 		expectedText := fmt.Sprintf("👤 %s %s", student.FirstName, student.LastName)
-// 		if messageText == expectedText {
-// 			selectedStudent = student
-// 			break
-// 		}
-// 	}
-
-// 	if selectedStudent == nil {
-// 		msg := tgbotapi.NewMessage(chatID, "❌ Ученик не найден")
-// 		b.api.Send(msg)
-// 		return
-// 	}
-// 	session.SelectedStudentID = selectedStudent.ID
-// 	session.State = StateSelectingSubscriptionType
-
-// 	// Показываем выбор типа абонемента
-// 	b.showSubscriptionTypes(chatID, selectedStudent)
-// }
-
 func (b *Bot) handleStudentSelection(chatID int64, messageText string) {
 	session := b.getOrCreateSession(chatID)
 	if session.State != StateSelectingStudent {
 		return
 	}
 
-	if messageText == "❌ Отмена" {
+	if isCancelText(messageText) {
 		b.cancelOperation(chatID, nil)
 		return
 	}
@@ -186,10 +112,13 @@ func (b *Bot) showSubscriptionTypes(chatID int64, student *models.User) {
 			tgbotapi.NewKeyboardButton("💪 Абонеменет на 12 занятий\n(Несгораемый)"),
 			tgbotapi.NewKeyboardButton("⛏️ Абонемент на 16 занятий\n(30дней)"),
 		),
+		tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton("❌ Отмена"),
+		),
 	)
 
 	msg.ReplyMarkup = keyboard
-	b.api.Send(msg)
+	b.sendTelegram(msg)
 }
 
 func (b *Bot) handleSubscriptionTypeSelection(chatID int64, messageText string) {
@@ -198,7 +127,7 @@ func (b *Bot) handleSubscriptionTypeSelection(chatID int64, messageText string) 
 		return
 	}
 
-	if messageText == "❌ Отмена" {
+	if isCancelText(messageText) {
 		b.cancelOperation(chatID, nil)
 		return
 	}
@@ -252,7 +181,7 @@ func (b *Bot) showConfirmation(chatID int64) {
 	)
 
 	msg.ReplyMarkup = keyboard
-	b.api.Send(msg)
+	b.sendTelegram(msg)
 }
 
 func (b *Bot) handleConfirmation(chatID int64, messageText string) {
@@ -261,11 +190,14 @@ func (b *Bot) handleConfirmation(chatID int64, messageText string) {
 		return
 	}
 
+	if isCancelText(messageText) {
+		b.cancelOperation(chatID, nil)
+		return
+	}
+
 	switch messageText {
 	case "✅ Подтвердить":
 		b.addSubscription(chatID, session)
-	case "❌ Отмена":
-		b.cancelOperation(chatID, nil)
 	default:
 		b.sendError(chatID, "❌ Неизвестная команда")
 	}
@@ -315,16 +247,15 @@ func (b *Bot) addSubscription(chatID int64, session *UserSession) {
 		studentUser, err := b.UserService.GetByID(session.SelectedStudentID)
 		if err == nil && studentUser != nil {
 			msgText := fmt.Sprintf(
-				"🎫 *Вам зачислен абонемент!*\n\n"+
-					"📋 *Тип:* %s\n"+
-					"📊 *Количество занятий:* %d\n\n"+
+				"🎫 Вам зачислен абонемент!\n\n"+
+					"📋 Тип: %s\n"+
+					"📊 Количество занятий: %d\n\n"+
 					"Теперь вы можете записываться на тренировки!",
 				subscriptionName,
 				totalLessons,
 			)
 			msg := tgbotapi.NewMessage(studentUser.TelegramID, msgText)
-			msg.ParseMode = "Markdown"
-			b.api.Send(msg)
+			b.sendTelegram(msg)
 		}
 	}
 }
@@ -351,9 +282,14 @@ func (b *Bot) cancelOperation(chatID int64, user *models.User) {
 	} else {
 		msg := tgbotapi.NewMessage(chatID, "❌ Операция отменена")
 		msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
-		b.api.Send(msg)
+		b.sendTelegram(msg)
 	}
 	b.resetSession(chatID)
+}
+
+func isCancelText(text string) bool {
+	normalized := strings.ToLower(strings.ReplaceAll(strings.TrimSpace(text), " ", ""))
+	return strings.Contains(normalized, "отмена")
 }
 
 // showMainKeyboardAfterOperation показывает главную клавиатуру после завершения операции
@@ -364,11 +300,11 @@ func (b *Bot) showMainKeyboardAfterOperation(chatID int64, message string) {
 	} else {
 		msg := tgbotapi.NewMessage(chatID, message)
 		msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
-		b.api.Send(msg)
+		b.sendTelegram(msg)
 	}
 }
 
 func (b *Bot) sendError(chatID int64, text string) {
 	msg := tgbotapi.NewMessage(chatID, text)
-	b.api.Send(msg)
+	b.sendTelegram(msg)
 }

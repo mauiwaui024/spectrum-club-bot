@@ -34,7 +34,6 @@ func (b *Bot) handleMySchedule(chatID int64, user *models.User) {
 	b.api.Send(msg)
 }
 
-// ///////////////////////////////////////eeeeeeeeeeeeeeeeeeeee
 func (b *Bot) handleScheduleTypeSelection(chatID int64, messageText string) {
 	session := b.getOrCreateSession(chatID)
 

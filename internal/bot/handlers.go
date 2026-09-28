@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"log"
 	"spectrum-club-bot/internal/models"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 )
@@ -20,8 +22,21 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) {
 
 	chatID := message.Chat.ID
 
-	// Проверяем состояние пользователя ПРЕЖДЕ обработки команд
 	session := b.getOrCreateSession(chatID)
+
+	// Глобальные команды и кнопки меню сбрасывают залипший флоу,
+	// иначе /start и «➕ Добавить абонемент» не показывают список.
+	if message.IsCommand() {
+		switch message.Command() {
+		case "start", "coach", "student", "schedule":
+			b.resetSession(chatID)
+			session = b.getOrCreateSession(chatID)
+		}
+	}
+	if session.State != StateDefault && isFlowInterruptText(message.Text) {
+		b.resetSession(chatID)
+		session = b.getOrCreateSession(chatID)
+	}
 
 	// Если у пользователя активная сессия - обрабатываем по состоянию
 	if session.State != StateDefault {
@@ -160,6 +175,11 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) {
 	}
 
 	// Обрабатываем текст сообщений (только если нет активной сессии)
+	if isCancelText(message.Text) {
+		b.cancelOperation(message.Chat.ID, user)
+		return
+	}
+
 	switch message.Text {
 	case "👤 Личный кабинет":
 		// Для учеников перенаправляем в WebApp, для тренеров показываем личный кабинет
@@ -205,8 +225,6 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) {
 		// Для студентов - функционал перенесен в WebApp
 		// Все операции доступны через команду /schedule или кнопку "📅 Календарь"
 
-	case "❌ Отмена":
-		b.cancelOperation(message.Chat.ID, user)
 	case "◀️ Назад":
 		b.sendWelcomeMessage(message.Chat.ID, user)
 	default:
@@ -353,7 +371,86 @@ func (b *Bot) showPersonalAccount(chatID int64, user *models.User) {
 
 func (b *Bot) sendMessage(chatID int64, text string) {
 	msg := tgbotapi.NewMessage(chatID, text)
-	b.api.Send(msg)
+	b.sendTelegram(msg)
+}
+
+func (b *Bot) sendTelegram(c tgbotapi.Chattable) error {
+	_, err := b.api.Send(c)
+	if err != nil {
+		log.Printf("[telegram Send] %v", err)
+	}
+	return err
+}
+
+const telegramMaxMessageLen = 3900
+
+func (b *Bot) sendLongPlain(chatID int64, text string, markup interface{}) error {
+	parts := splitTelegramText(text, telegramMaxMessageLen)
+	for i, part := range parts {
+		msg := tgbotapi.NewMessage(chatID, part)
+		if i == len(parts)-1 && markup != nil {
+			msg.ReplyMarkup = markup
+		}
+		if err := b.sendTelegram(msg); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func splitTelegramText(text string, max int) []string {
+	if max < 1 {
+		max = telegramMaxMessageLen
+	}
+	text = strings.TrimRight(text, "\n")
+	if text == "" {
+		return []string{" "}
+	}
+	var chunks []string
+	for text != "" {
+		if len(text) <= max {
+			chunks = append(chunks, text)
+			break
+		}
+		window := text[:max]
+		cut := strings.LastIndex(window, "\n")
+		if cut <= 0 {
+			cut = max
+			for cut > 0 && !utf8.RuneStart(text[cut]) {
+				cut--
+			}
+			if cut == 0 {
+				cut = max
+			}
+		}
+		chunks = append(chunks, text[:cut])
+		text = strings.TrimLeft(text[cut:], "\n")
+	}
+	return chunks
+}
+
+func isFlowInterruptText(text string) bool {
+	switch text {
+	case "➕ Добавить абонемент",
+		"🗑️ Удалить абонемент",
+		"👥 Список учеников с абонементами",
+		"👥 Мои ученики",
+		"💳 Управление абонементами",
+		"📅 Управление расписанием",
+		"📅 Календарь",
+		"👤 Личный кабинет",
+		"🔐 Задать пароль",
+		"📋 Создать из шаблонов",
+		"➕ Добавить тренировку",
+		"✏️ Редактировать тренировку",
+		"📅 Мое расписание",
+		"◀️ Назад в главное меню",
+		"◀️ Назад",
+		"◀️ Назад к управлению расписанием":
+		return true
+	default:
+		return false
+	}
 }
 
 func (b *Bot) showAllStudens(chatID int64, user *models.User) {
@@ -400,23 +497,14 @@ func (b *Bot) showAllStudens(chatID int64, user *models.User) {
 		subscriptionMap[subscription.StudentID] = append(subscriptionMap[subscription.StudentID], subscription)
 	}
 
-	// Формируем сообщение со списком учеников и их абонементами
-	var message string = "👥 *Список всех учеников:*\n\n"
+	// Формируем сообщение со списком учеников и их абонементами.
+	// Без Markdown: имена из Telegram ломают разбор (* _ [).
+	var message string = "👥 Список всех учеников:\n\n"
 
 	for i, studentUser := range students {
-		// Формируем отображаемое имя ученика
-		displayName := studentUser.FirstName
-		if studentUser.LastName != "" {
-			displayName += " " + studentUser.LastName
-		}
-		if displayName == "" && studentUser.Username != "" {
-			displayName = "@" + studentUser.Username
-		}
-		if displayName == "" {
-			displayName = "Неизвестный ученик"
-		}
+		displayName := getStudentDisplayName(studentUser)
 
-		message += fmt.Sprintf("%d. *%s*\n", i+1, displayName)
+		message += fmt.Sprintf("%d. %s\n", i+1, displayName)
 
 		// Получаем информацию об абонементах
 		student := studentMap[studentUser.ID]
@@ -461,7 +549,7 @@ func (b *Bot) showAllStudens(chatID int64, user *models.User) {
 		message += "\n"
 	}
 
-	msg := tgbotapi.NewMessage(chatID, message)
-	msg.ParseMode = "Markdown"
-	b.api.Send(msg)
+	if err := b.sendLongPlain(chatID, message, nil); err != nil {
+		b.sendError(chatID, "❌ Не удалось показать список учеников")
+	}
 }

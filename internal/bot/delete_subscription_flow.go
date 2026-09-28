@@ -29,29 +29,25 @@ func (b *Bot) handleDeleteSubscription(chatID int64, user *models.User) {
 		return
 	}
 
-	// Сохраняем учеников в сессии
+	if err := b.showStudentsForDeletion(chatID, students); err != nil {
+		b.sendError(chatID, "❌ Не удалось показать список учеников")
+		return
+	}
+
 	session := b.getOrCreateSession(chatID)
 	session.State = StateSelectingStudentForDeletion
 	session.StudentsForSelection = students
-
-	// Показываем список учеников
-	b.showStudentsForDeletion(chatID, students)
 }
 
-func (b *Bot) showStudentsForDeletion(chatID int64, students []*models.User) {
-	// Формируем сообщение со списком учеников
-	msgText := "👥 *Выберите ученика для удаления абонемента:*\n\n"
+func (b *Bot) showStudentsForDeletion(chatID int64, students []*models.User) error {
+	msgText := "Выберите ученика для удаления абонемента:\n\n"
 	for i, student := range students {
 		displayName := getStudentDisplayName(student)
 		msgText += fmt.Sprintf("%d. %s\n", i+1, displayName)
 	}
-	msgText += "\nВведите номер ученика или отправьте '❌ Отмена'"
+	msgText += "\nВведите номер ученика или нажмите «❌ Отмена»"
 
-	msg := tgbotapi.NewMessage(chatID, msgText)
-	msg.ParseMode = "Markdown"
-	msg.ReplyMarkup = createCancelKeyboard()
-
-	b.api.Send(msg)
+	return b.sendLongPlain(chatID, msgText, createCancelKeyboard())
 }
 
 func (b *Bot) handleStudentSelectionForDeletion(chatID int64, messageText string) {
@@ -60,7 +56,7 @@ func (b *Bot) handleStudentSelectionForDeletion(chatID int64, messageText string
 		return
 	}
 
-	if messageText == "❌ Отмена" {
+	if isCancelText(messageText) {
 		b.cancelOperation(chatID, nil)
 		return
 	}
@@ -95,7 +91,7 @@ func (b *Bot) handleStudentSelectionForDeletion(chatID int64, messageText string
 		msg := tgbotapi.NewMessage(chatID,
 			fmt.Sprintf("❌ У ученика %s %s нет абонементов",
 				selectedStudent.FirstName, selectedStudent.LastName))
-		b.api.Send(msg)
+		b.sendTelegram(msg)
 		b.resetSession(chatID)
 		return
 	}
@@ -105,7 +101,7 @@ func (b *Bot) handleStudentSelectionForDeletion(chatID int64, messageText string
 }
 
 func (b *Bot) showSubscriptionsListForDeletion(chatID int64, student *models.User, subscriptions []*models.Subscription) {
-	msgText := fmt.Sprintf("🎫 *Выберите абонемент для удаления у %s %s:*\n\n", student.FirstName, student.LastName)
+	msgText := fmt.Sprintf("🎫 Выберите абонемент для удаления у %s %s:\n\n", student.FirstName, student.LastName)
 
 	for i, subscription := range subscriptions {
 		var status string
@@ -125,12 +121,11 @@ func (b *Bot) showSubscriptionsListForDeletion(chatID int64, student *models.Use
 			subscription.EndDate.Format("02.01.2006"))
 	}
 
-	msgText += "\nВведите номер абонемента или отправьте '❌ Отмена'"
+	msgText += "\nВведите номер абонемента или нажмите «❌ Отмена»"
 
-	msg := tgbotapi.NewMessage(chatID, msgText)
-	msg.ParseMode = "Markdown"
-	msg.ReplyMarkup = createCancelKeyboard()
-	b.api.Send(msg)
+	if err := b.sendLongPlain(chatID, msgText, createCancelKeyboard()); err != nil {
+		b.sendError(chatID, "❌ Не удалось показать список абонементов")
+	}
 }
 
 func (b *Bot) handleSubscriptionSelectionForDeletion(chatID int64, messageText string) {
@@ -139,7 +134,7 @@ func (b *Bot) handleSubscriptionSelectionForDeletion(chatID int64, messageText s
 		return
 	}
 
-	if messageText == "❌ Отмена" {
+	if isCancelText(messageText) {
 		b.cancelOperation(chatID, nil)
 		return
 	}
@@ -170,12 +165,12 @@ func (b *Bot) showDeletionConfirmation(chatID int64, student *models.User, subsc
 	}
 
 	msgText := fmt.Sprintf(
-		"🚨 *Подтвердите удаление абонемента:*\n\n"+
-			"👤 *Ученик:* %s %s\n"+
-			"🎫 *Абонемент:* %d/%d занятий\n"+
-			"📅 *Действует до:* %s\n"+
-			"🔰 *Статус:* %s\n\n"+
-			"❌ *Это действие нельзя отменить!*",
+		"🚨 Подтвердите удаление абонемента:\n\n"+
+			"👤 Ученик: %s %s\n"+
+			"🎫 Абонемент: %d/%d занятий\n"+
+			"📅 Действует до: %s\n"+
+			"🔰 Статус: %s\n\n"+
+			"❌ Это действие нельзя отменить!",
 		student.FirstName,
 		student.LastName,
 		subscription.RemainingLessons,
@@ -185,7 +180,6 @@ func (b *Bot) showDeletionConfirmation(chatID int64, student *models.User, subsc
 	)
 
 	msg := tgbotapi.NewMessage(chatID, msgText)
-	msg.ParseMode = "Markdown"
 
 	keyboard := tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButtonRow(
@@ -194,7 +188,7 @@ func (b *Bot) showDeletionConfirmation(chatID int64, student *models.User, subsc
 		),
 	)
 	msg.ReplyMarkup = keyboard
-	b.api.Send(msg)
+	b.sendTelegram(msg)
 }
 
 func (b *Bot) handleSubscriptionDeletionConfirmation(chatID int64, messageText string) {
@@ -203,11 +197,14 @@ func (b *Bot) handleSubscriptionDeletionConfirmation(chatID int64, messageText s
 		return
 	}
 
+	if isCancelText(messageText) {
+		b.cancelOperation(chatID, nil)
+		return
+	}
+
 	switch messageText {
 	case "✅ Удалить абонемент":
 		b.deleteSubscription(chatID, session)
-	case "❌ Отмена":
-		b.cancelOperation(chatID, nil)
 	default:
 		b.sendError(chatID, "❌ Неизвестная команда")
 	}
