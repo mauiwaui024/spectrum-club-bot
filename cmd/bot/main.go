@@ -33,7 +33,6 @@ import (
 )
 
 func main() {
-	// Загружаем конфигурацию
 	if err := config.Load(); err != nil {
 		log.Fatalf("❌ Ошибка загрузки конфигурации: %v", err)
 	}
