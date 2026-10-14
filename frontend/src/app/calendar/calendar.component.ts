@@ -51,44 +51,19 @@ export class CalendarComponent implements OnInit {
   }
 
   ngOnInit() {
-    // Обновляем initData при инициализации компонента
-    this.calendarService.updateInitData();
-
-    const tg = (window as any).Telegram?.WebApp;
-    const hasInitData = !!(tg && tg.initData && tg.initData.length > 0);
-    if (!hasInitData) {
-      this.calendarService.getAuthStatus().subscribe({
-        next: (status: any) => {
-          if (!status?.authenticated) {
-            this.router.navigate(['/login'], { queryParams: { redirect: this.router.url } });
-          }
-        },
-        error: () => {
+    this.calendarService.getAuthStatus().subscribe({
+      next: (status: any) => {
+        if (!status?.authenticated) {
           this.router.navigate(['/login'], { queryParams: { redirect: this.router.url } });
+          return;
         }
-      });
-    }
-    
-    // Проверяем наличие initData после небольшой задержки (для WebApp инициализации)
-    setTimeout(() => {
-      if (tg) {
-        const hasInitDataInner = tg.initData && tg.initData.length > 0;
-        console.log('🔍 Проверка initData при загрузке календаря:', {
-          hasInitData: hasInitDataInner,
-          initDataLength: tg.initData?.length || 0,
-          platform: tg.platform || 'unknown',
-          version: tg.version || 'unknown',
-          ready: tg.ready || false
-        });
-        
-        if (hasInitDataInner) {
-          console.log('✅ initData успешно получен через WebApp кнопку!');
-        } else {
-          console.warn('⚠️ initData пустой. Убедитесь, что страница открыта через WebApp кнопку в Telegram боте.');
-        }
+        this.isCoach = !!status.is_coach;
+      },
+      error: () => {
+        this.router.navigate(['/login'], { queryParams: { redirect: this.router.url } });
       }
-    }, 1000);
-    
+    });
+
     this.route.queryParams.subscribe(params => {
       const viewParam = params['view'] || 'month';
       const date = params['date'] || null;
@@ -440,6 +415,21 @@ export class CalendarComponent implements OnInit {
   isAlreadyAttended(participant: any): boolean {
     return participant.attended === true || participant.status === 'attended';
   }
+
+  unmarkAttendance(studentId: number): void {
+    if (!this.selectedTraining?.training?.id) return;
+    if (!confirm('Снять отметку посещаемости и вернуть занятие?')) return;
+    const trainingId = this.selectedTraining.training.id;
+    this.calendarService.unmarkAttendance(trainingId, studentId).subscribe({
+      next: () => {
+        this.calendarService.getTrainingDetails(trainingId).subscribe({
+          next: (details) => (this.selectedTraining = details)
+        });
+        this.reloadCalendar();
+      },
+      error: (err) => alert(err?.error || 'Не удалось снять отметку')
+    });
+  }
   
   // Переключение выбора конкретного ученика
   toggleStudentSelection(studentId: number) {
@@ -568,9 +558,6 @@ export class CalendarComponent implements OnInit {
   registerForTraining() {
     if (!this.selectedTraining) return;
 
-    // Обновляем initData перед запросом (на случай, если он появился позже)
-    this.calendarService.updateInitData();
-    
     if (!confirm('Записаться на эту тренировку?')) return;
 
     this.calendarService.registerForTraining(this.selectedTraining.training.id).subscribe({
@@ -600,9 +587,6 @@ export class CalendarComponent implements OnInit {
 
   cancelRegistration() {
     if (!this.selectedTraining) return;
-
-    // Обновляем initData перед запросом (на случай, если он появился позже)
-    this.calendarService.updateInitData();
 
     if (!confirm('Вы уверены, что хотите отменить запись?')) return;
 

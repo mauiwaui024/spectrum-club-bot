@@ -1,0 +1,107 @@
+<div class="page">
+  <header class="page-header">
+    <h1>Шаблоны недели</h1>
+    <p class="hint">Редактируйте существующие слоты по дням. Новые добавляйте внутри нужного дня.</p>
+  </header>
+
+  <p *ngIf="error" class="error">{{ error }}</p>
+  <p *ngIf="message" class="ok">{{ message }}</p>
+  <p *ngIf="loading" class="muted">Загрузка...</p>
+
+  <section *ngFor="let day of days" class="day-block">
+    <div class="day-header">
+      <h2>{{ dayNames[day] }}</h2>
+      <button type="button" class="btn-add" (click)="startAdd(day)">+ Слот</button>
+    </div>
+
+    <div *ngIf="!slotsForDay(day).length && addingDay !== day" class="empty-day">
+      Нет слотов
+    </div>
+
+    <ng-container *ngFor="let t of slotsForDay(day)">
+      <article
+        class="slot"
+        [class.inactive]="!t.is_active"
+        [class.editing]="editing?.id === t.id"
+        (click)="startEdit(t)">
+        <div class="slot-main">
+          <span class="time">{{ formatTime(t.start_time) }}–{{ formatTime(t.end_time) }}</span>
+          <span class="group">{{ t.group_name || ('группа #' + t.group_id) }}</span>
+          <span class="desc" *ngIf="t.description">{{ t.description }}</span>
+          <span class="badge" *ngIf="!t.is_active">выкл</span>
+        </div>
+        <div class="kebab" (click)="$event.stopPropagation()">
+          <button type="button" class="kebab-btn" (click)="toggleMenu(t.id, $event)" aria-label="Действия">⋯</button>
+          <div class="kebab-menu" *ngIf="menuOpenId === t.id">
+            <button type="button" (click)="startEdit(t, $event)">Изменить</button>
+            <button type="button" (click)="toggleActive(t, $event)">
+              {{ t.is_active ? 'Выкл' : 'Вкл' }}
+            </button>
+            <button type="button" class="danger-text" (click)="deleteTemplate(t, $event)">Удалить</button>
+          </div>
+        </div>
+      </article>
+
+      <div *ngIf="editing?.id === t.id" class="edit-panel" (click)="$event.stopPropagation()">
+        <h3>Редактирование · {{ dayNames[day] }}</h3>
+        <div class="form-grid">
+          <label>
+            Группа
+            <select [(ngModel)]="editGroupId">
+              <option *ngFor="let g of groups" [ngValue]="g.id">{{ g.name }}</option>
+            </select>
+          </label>
+          <label>
+            Начало
+            <input type="time" [(ngModel)]="editStart" />
+          </label>
+          <label>
+            Конец
+            <input type="time" [(ngModel)]="editEnd" />
+          </label>
+          <label class="full">
+            Описание / место
+            <input type="text" [(ngModel)]="editDesc" />
+          </label>
+          <label class="toggle">
+            <input type="checkbox" [(ngModel)]="editActive" />
+            Активен (участвует в «создать из шаблонов»)
+          </label>
+        </div>
+        <div class="panel-actions">
+          <button type="button" class="btn-primary" (click)="saveEdit()">Сохранить</button>
+          <button type="button" class="btn-ghost" (click)="cancelEdit()">Отмена</button>
+        </div>
+      </div>
+    </ng-container>
+
+    <div *ngIf="addingDay === day" class="edit-panel add-panel" (click)="$event.stopPropagation()">
+      <h3>Новый слот · {{ dayNames[day] }}</h3>
+      <p class="hint">Слот появится в этом дне недели вместе с остальными.</p>
+      <div class="form-grid">
+        <label>
+          Группа
+          <select [(ngModel)]="addGroupId">
+            <option *ngFor="let g of groups" [ngValue]="g.id">{{ g.name }}</option>
+          </select>
+        </label>
+        <label>
+          Начало
+          <input type="time" [(ngModel)]="addStart" />
+        </label>
+        <label>
+          Конец
+          <input type="time" [(ngModel)]="addEnd" />
+        </label>
+        <label class="full">
+          Описание / место
+          <input type="text" [(ngModel)]="addDesc" placeholder="Тенгус (блдр)" />
+        </label>
+      </div>
+      <div class="panel-actions">
+        <button type="button" class="btn-primary" (click)="saveAdd()">Добавить</button>
+        <button type="button" class="btn-ghost" (click)="cancelAdd()">Отмена</button>
+      </div>
+    </div>
+  </section>
+</div>

@@ -95,39 +95,54 @@ func (s *subscriptionService) GetSubscriptionHistory(studentID int64) ([]*models
 }
 
 func (s *subscriptionService) Create12Unlimited(studentID int64) error {
-	subscription := &models.Subscription{
-		StudentID:        studentID,
-		StartDate:        time.Now(),
-		EndDate:          time.Now().AddDate(2, 0, 0), // 2 года
-		TotalLessons:     12,
-		RemainingLessons: 12,
-		CreatedAt:        time.Now(),
-	}
-	return s.subscriptionRepo.Create(subscription)
+	return s.CreateWithEndDate(studentID, 12, time.Now().AddDate(2, 0, 0))
 }
 
 func (s *subscriptionService) Create16For30Days(studentID int64) error {
+	return s.CreateWithEndDate(studentID, 16, time.Now().AddDate(0, 0, 30))
+}
+
+func (s *subscriptionService) Create1For30Days(studentID int64) error {
+	return s.CreateWithEndDate(studentID, 1, time.Now().AddDate(0, 0, 30))
+}
+
+func (s *subscriptionService) CreateWithEndDate(studentID int64, lessons int, endDate time.Time) error {
+	switch lessons {
+	case 1, 2, 3, 4, 8, 12, 16:
+	default:
+		return fmt.Errorf("неподдерживаемое число занятий: %d", lessons)
+	}
+	now := time.Now()
+	endDay := time.Date(endDate.Year(), endDate.Month(), endDate.Day(), 23, 59, 59, 0, endDate.Location())
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	if endDay.Before(today) {
+		return fmt.Errorf("дата окончания не может быть в прошлом")
+	}
 	subscription := &models.Subscription{
 		StudentID:        studentID,
-		StartDate:        time.Now(),
-		EndDate:          time.Now().AddDate(0, 0, 30), // 30 дней
-		TotalLessons:     16,
-		RemainingLessons: 16,
-		CreatedAt:        time.Now(),
+		StartDate:        now,
+		EndDate:          endDay,
+		TotalLessons:     lessons,
+		RemainingLessons: lessons,
+		CreatedAt:        now,
 	}
 	return s.subscriptionRepo.Create(subscription)
 }
 
-func (s *subscriptionService) Create1For30Days(studentID int64) error {
-	subscription := &models.Subscription{
-		StudentID:        studentID,
-		StartDate:        time.Now(),
-		EndDate:          time.Now().AddDate(0, 0, 30), // 30 дней
-		TotalLessons:     1,
-		RemainingLessons: 1,
-		CreatedAt:        time.Now(),
+// MaxLessonsForSubscriptionType возвращает потолок занятий для абонемента по текущему total_lessons.
+func MaxLessonsForSubscriptionType(totalLessons int) int {
+	switch totalLessons {
+	case 1, 2, 3, 4, 8, 12, 16:
+		return totalLessons
+	default:
+		// Ближайший допустимый потолок сверху из каталога.
+		for _, limit := range []int{1, 2, 3, 4, 8, 12, 16} {
+			if totalLessons <= limit {
+				return limit
+			}
+		}
+		return 16
 	}
-	return s.subscriptionRepo.Create(subscription)
 }
 
 // DecrementRemainingLessons уменьшает remaining_lessons на 1 для активного абонемента ученика
@@ -145,23 +160,7 @@ func (s *subscriptionService) AddLessons(subscriptionID int64, count int) error 
 		return fmt.Errorf("абонемент с ID %d не найден", subscriptionID)
 	}
 
-	// Определяем максимальный лимит для типа абонемента
-	// Типы: 1 (пробное), 12 (несгораемый), 16 (30 дней)
-	// Определяем тип по точным значениям или ближайшему нижнему
-	var maxTypeLimit int
-	if subscription.TotalLessons == 1 {
-		maxTypeLimit = 1
-	} else if subscription.TotalLessons == 12 {
-		maxTypeLimit = 12
-	} else if subscription.TotalLessons == 16 {
-		maxTypeLimit = 16
-	} else if subscription.TotalLessons < 12 {
-		// Между 1 и 12, предполагаем тип 12
-		maxTypeLimit = 12
-	} else {
-		// >= 13 или > 16, предполагаем тип 16
-		maxTypeLimit = 16
-	}
+	maxTypeLimit := MaxLessonsForSubscriptionType(subscription.TotalLessons)
 
 	// Максимум, который можно добавить до исходного количества (использованные занятия)
 	possibleToAddUsed := subscription.TotalLessons - subscription.RemainingLessons
@@ -216,6 +215,23 @@ func (s *subscriptionService) AddLessons(subscriptionID int64, count int) error 
 	}
 
 	return s.subscriptionRepo.AddLessons(subscriptionID, count)
+}
+
+func (s *subscriptionService) SetEndDate(subscriptionID int64, endDate time.Time) error {
+	subscription, err := s.subscriptionRepo.GetByID(subscriptionID)
+	if err != nil {
+		return err
+	}
+	if subscription == nil {
+		return fmt.Errorf("абонемент с ID %d не найден", subscriptionID)
+	}
+	now := time.Now()
+	endDay := time.Date(endDate.Year(), endDate.Month(), endDate.Day(), 23, 59, 59, 0, endDate.Location())
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	if endDay.Before(today) {
+		return fmt.Errorf("дата окончания не может быть в прошлом")
+	}
+	return s.subscriptionRepo.SetEndDate(subscriptionID, endDay)
 }
 
 // RemoveLessons снимает занятия с абонемента

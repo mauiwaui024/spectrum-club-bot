@@ -72,6 +72,10 @@ func (h *Handler) BrowserLoginAPI(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "User not found", http.StatusUnauthorized)
 		return
 	}
+	if !user.IsActive {
+		http.Error(w, "Account deactivated", http.StatusForbidden)
+		return
+	}
 	if !h.userService.VerifyBrowserPassword(user, req.Password) {
 		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 		return
@@ -178,5 +182,6 @@ func (h *Handler) AuthStatusAPI(w http.ResponseWriter, r *http.Request) {
 		"username":      user.Username,
 		"role":          user.Role,
 		"is_coach":      user.Role == "coach",
+		"pd_consent_ok": user.HasCurrentPDConsent(),
 	})
 }

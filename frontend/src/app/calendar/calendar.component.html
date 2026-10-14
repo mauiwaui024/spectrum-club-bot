@@ -1,56 +1,23 @@
 <div class="container">
-  <!-- Header -->
+  <!-- View selector -->
   <div class="calendar-header">
-    <div class="header-left">
-      <a [routerLink]="['/calendar']" class="logo">
-        <img src="assets/spectr_club_logo.png" alt="Spectrum Club" class="logo-img">
-      </a>
-    </div>
-    <div class="header-right">
-      <div class="view-selector">
-        <button 
-          class="view-btn" 
-          [class.active]="view === CalendarView.Month"
-          (click)="changeView(CalendarView.Month)">Месяц</button>
-        <button 
-          class="view-btn" 
-          [class.active]="view === CalendarView.Week"
-          (click)="changeView(CalendarView.Week)">Неделя</button>
-        <button 
-          class="view-btn" 
-          [class.active]="view === CalendarView.Day"
-          (click)="changeView(CalendarView.Day)">День</button>
-      </div>
+    <div class="view-selector">
+      <button
+        class="view-btn"
+        [class.active]="view === CalendarView.Month"
+        (click)="changeView(CalendarView.Month)">Месяц</button>
+      <button
+        class="view-btn"
+        [class.active]="view === CalendarView.Week"
+        (click)="changeView(CalendarView.Week)">Неделя</button>
+      <button
+        class="view-btn"
+        [class.active]="view === CalendarView.Day"
+        (click)="changeView(CalendarView.Day)">День</button>
     </div>
   </div>
 
-  <!-- Navigation Menu -->
-  <div class="nav-menu">
-    <a [routerLink]="['/calendar']" routerLinkActive="active" class="nav-item">
-      <span class="nav-icon">📅</span>
-      <span class="nav-text">Календарь</span>
-    </a>
-    <!-- For students only -->
-    <a *ngIf="!isCoach" [routerLink]="['/my-registrations']" routerLinkActive="active" class="nav-item">
-      <span class="nav-icon">📝</span>
-      <span class="nav-text">Мои записи</span>
-    </a>
-    <!-- For students: Абонемент, For coaches: Абонементы учеников -->
-    <a *ngIf="!isCoach" [routerLink]="['/my-subscription']" routerLinkActive="active" class="nav-item">
-      <span class="nav-icon">🎫</span>
-      <span class="nav-text">Абонемент</span>
-    </a>
-    <a *ngIf="isCoach" [routerLink]="['/students-subscriptions']" routerLinkActive="active" class="nav-item">
-      <span class="nav-icon">🎫</span>
-      <span class="nav-text">Абонементы учеников</span>
-    </a>
-    <a [routerLink]="['/profile']" routerLinkActive="active" class="nav-item">
-      <span class="nav-icon">👤</span>
-      <span class="nav-text">Профиль</span>
-    </a>
-  </div>
-
-  <!-- Navigation -->
+  <!-- Date navigation -->
   <div class="calendar-nav">
     <button 
       class="g-btn" 
@@ -122,16 +89,22 @@
           </div>
           <div class="detail-row">
             <span class="detail-label">🏃 Участников:</span>
-            <span class="detail-value">
-              {{ selectedTraining.participants_count }}
-              <span *ngIf="selectedTraining.training.max_participants">
-                / {{ selectedTraining.training.max_participants }}
-              </span>
-            </span>
+            <span class="detail-value">{{ selectedTraining.participants_count }}</span>
           </div>
           <div class="detail-row">
             <span class="detail-label">📝 Описание:</span>
             <span class="detail-value">{{ selectedTraining.training.description || 'Описание отсутствует' }}</span>
+          </div>
+          <div class="detail-row" *ngIf="selectedTraining.plan && (selectedTraining.plan.description || selectedTraining.plan.items?.length)">
+            <span class="detail-label">📋 План:</span>
+            <div class="detail-value">
+              <div *ngIf="selectedTraining.plan.description">{{ selectedTraining.plan.description }}</div>
+              <ol *ngIf="selectedTraining.plan.items?.length" class="plan-list">
+                <li *ngFor="let item of selectedTraining.plan.items">
+                  {{ item.text }}<span *ngIf="item.exercise_description">, {{ item.exercise_description }}</span><span *ngIf="item.sets && item.reps"> · {{ item.sets }}×{{ item.reps }}</span><span *ngIf="item.sets && !item.reps"> · {{ item.sets }} подх.</span><span *ngIf="!item.sets && item.reps"> · {{ item.reps }} повт.</span><span *ngIf="item.rest_seconds"> · отдых {{ item.rest_seconds }} с</span>
+                </li>
+              </ol>
+            </div>
           </div>
           
           <div *ngIf="selectedTraining.participants && selectedTraining.participants.length > 0" 
@@ -177,6 +150,14 @@
                </div>
                <div class="attendance-time">Записан: {{ formatDateTime(participant.created_at) }}</div>
              </div>
+             <button
+               *ngIf="isCoach && isAlreadyAttended(participant)"
+               type="button"
+               class="modal-btn modal-btn-secondary"
+               style="margin-left: 8px; padding: 4px 8px; font-size: 12px;"
+               (click)="unmarkAttendance(participant.student_id)">
+               Снять
+             </button>
            </div>
          </div>
           </div>
@@ -224,7 +205,6 @@
                 <span *ngIf="selectedTraining.is_coach">Только ученики могут записываться на тренировки.</span>
                 <span *ngIf="!selectedTraining.is_coach">
                   Невозможно записаться
-                  <span *ngIf="selectedTraining.is_full"> (Мест нет)</span>
                   <span *ngIf="selectedTraining.is_past"> (Тренировка прошла)</span>
                 </span>
               </span>

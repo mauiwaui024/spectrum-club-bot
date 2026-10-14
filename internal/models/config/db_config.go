@@ -2,8 +2,6 @@ package config
 
 import (
 	"fmt"
-	"strconv"
-	"strings"
 )
 
 // DatabaseConfig конфигурация БД
@@ -23,12 +21,7 @@ func Load() error {
 	AppConfig = &Config{
 		HTTPPort:    getEnv("HTTP_PORT", "8080"),
 		Environment: env,
-		Bot: BotConfig{
-			Token:    getEnv("BOT_TOKEN", ""),
-			Debug:    getEnvAsBool("BOT_DEBUG", env != "production"),
-			AdminIDs: parseAdminIDs(getEnv("ADMIN_IDS", "")),
-			BaseURL:  getEnv("BASE_URL", ""),
-		},
+		BaseURL:     getEnv("BASE_URL", ""),
 		Database: DatabaseConfig{
 			Host:     getEnv("DB_HOST", "localhost"),
 			Port:     getEnvAsInt("DB_PORT", 5432),
@@ -42,13 +35,8 @@ func Load() error {
 	return validate()
 }
 
-// validate проверяет обязательные параметры
 func validate() error {
 	var errors []string
-
-	if AppConfig.Bot.Token == "" {
-		errors = append(errors, "BOT_TOKEN is required")
-	}
 
 	if AppConfig.Database.Username == "" {
 		errors = append(errors, "DB_USER is required")
@@ -59,31 +47,26 @@ func validate() error {
 	}
 
 	if len(errors) > 0 {
-		return fmt.Errorf("config validation failed: %s", strings.Join(errors, ", "))
+		return fmt.Errorf("config validation failed: %s", joinErrors(errors))
 	}
 
 	return nil
 }
 
-// getSSLMode возвращает режим SSL в зависимости от окружения
-func getSSLMode(env string) string {
-	if env == "production" {
-		return "require" // В продакшене всегда SSL
+func joinErrors(errs []string) string {
+	out := ""
+	for i, e := range errs {
+		if i > 0 {
+			out += ", "
+		}
+		out += e
 	}
-	return "disable" // В разработке можно отключить
+	return out
 }
 
-// parseAdminIDs парсит список ID администраторов
-func parseAdminIDs(ids string) []int64 {
-	if ids == "" {
-		return []int64{}
+func getSSLMode(env string) string {
+	if env == "production" {
+		return "require"
 	}
-
-	var result []int64
-	for _, idStr := range strings.Split(ids, ",") {
-		if id, err := strconv.ParseInt(strings.TrimSpace(idStr), 10, 64); err == nil {
-			result = append(result, id)
-		}
-	}
-	return result
+	return "disable"
 }

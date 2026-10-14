@@ -1,0 +1,84 @@
+<div class="page">
+  <header class="page-header">
+    <h1>Планы</h1>
+    <p class="hint">Заготовки тренировок. Назначенный на дату план — отдельная копия: правка здесь не меняет уже поставленные тренировки.</p>
+  </header>
+
+  <p *ngIf="error" class="error">{{ error }}</p>
+  <p *ngIf="message" class="ok">{{ message }}</p>
+  <p *ngIf="loading" class="muted">Загрузка...</p>
+
+  <ul class="list" *ngIf="!loading">
+    <li *ngFor="let t of templates">
+      <div *ngIf="editingId !== t.id" class="row">
+        <div class="main">
+          <strong>{{ t.title }}</strong>
+          <span class="meta">{{ t.items.length }} упр. <span *ngIf="t.description">· {{ t.description }}</span></span>
+        </div>
+        <div class="kebab" (click)="$event.stopPropagation()">
+          <button type="button" class="kebab-btn" (click)="toggleMenu(t.id, $event)" aria-label="Действия">⋯</button>
+          <div class="kebab-menu" *ngIf="menuOpenId === t.id">
+            <button type="button" (click)="startEdit(t, $event)">Изменить</button>
+            <button type="button" class="danger-text" (click)="deleteTemplate(t, $event)">Удалить</button>
+          </div>
+        </div>
+      </div>
+      <div *ngIf="editingId === t.id" class="edit-form">
+        <label>Название <input [(ngModel)]="editTitle" /></label>
+        <label>Описание <textarea rows="3" [(ngModel)]="editDescription"></textarea></label>
+        <div class="items">
+          <div class="item" *ngFor="let item of editItems; let i = index">
+            <label class="grow" *ngIf="item.legacy">
+              Упражнение
+              <input [value]="item.text" disabled />
+            </label>
+            <label class="grow" *ngIf="!item.legacy">
+              Упражнение
+              <select [(ngModel)]="item.exercise_id">
+                <option [ngValue]="null">Выберите</option>
+                <option *ngFor="let ex of exercises" [ngValue]="ex.id">{{ ex.name }}</option>
+              </select>
+            </label>
+            <label>Подходы <input type="number" min="1" [(ngModel)]="item.sets" /></label>
+            <label>Повторения <input type="number" min="1" [(ngModel)]="item.reps" /></label>
+            <label>Отдых, сек <input type="number" min="1" [(ngModel)]="item.rest_seconds" /></label>
+            <button type="button" class="ghost" (click)="removeItem(editItems, i)" aria-label="Удалить строку">×</button>
+          </div>
+          <button type="button" class="ghost" (click)="addItem(editItems)">Добавить упражнение</button>
+        </div>
+        <div class="actions">
+          <button type="button" (click)="saveEdit()">Сохранить</button>
+          <button type="button" class="ghost" (click)="cancelEdit()">Отмена</button>
+        </div>
+      </div>
+    </li>
+    <li *ngIf="!templates.length" class="empty">Заготовок пока нет</li>
+  </ul>
+
+  <section class="add-card">
+    <h2>Новая заготовка</h2>
+    <label>Название <input [(ngModel)]="newTitle" /></label>
+    <label>Описание <textarea rows="3" [(ngModel)]="newDescription"></textarea></label>
+    <div class="items">
+      <div class="item" *ngFor="let item of newItems; let i = index">
+        <label class="grow" *ngIf="item.legacy">
+          Упражнение
+          <input [value]="item.text" disabled />
+        </label>
+        <label class="grow" *ngIf="!item.legacy">
+          Упражнение
+          <select [(ngModel)]="item.exercise_id">
+            <option [ngValue]="null">Выберите</option>
+            <option *ngFor="let ex of exercises" [ngValue]="ex.id">{{ ex.name }}</option>
+          </select>
+        </label>
+        <label>Подходы <input type="number" min="1" [(ngModel)]="item.sets" /></label>
+        <label>Повторения <input type="number" min="1" [(ngModel)]="item.reps" /></label>
+        <label>Отдых, сек <input type="number" min="1" [(ngModel)]="item.rest_seconds" /></label>
+        <button type="button" class="ghost" (click)="removeItem(newItems, i)" aria-label="Удалить строку">×</button>
+      </div>
+      <button type="button" class="ghost" (click)="addItem(newItems)">Добавить упражнение</button>
+    </div>
+    <button type="button" (click)="create()">Создать</button>
+  </section>
+</div>

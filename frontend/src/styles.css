@@ -1,6 +1,44 @@
 /* Angular Calendar styles - must be first */
 @import "../node_modules/angular-calendar/css/angular-calendar.css";
 
+:root {
+  color-scheme: light;
+  --bg: #ffffff;
+  --text: #202124;
+  --muted: #5f6368;
+  --card: #ffffff;
+  --border: #e5e7eb;
+  --input-bg: #ffffff;
+  --hover: #f1f3f4;
+  --primary: #1a73e8;
+  --primary-text: #ffffff;
+  --primary-soft: #e8f0fe;
+  --danger-bg: #fee2e2;
+  --danger-border: #fecaca;
+  --danger-text: #b91c1c;
+  --ok: #15803d;
+  --shadow: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #1a1b1e;
+  --text: #e8eaed;
+  --muted: #9aa0a6;
+  --card: #2d2f33;
+  --border: #3c4043;
+  --input-bg: #202124;
+  --hover: #3c4043;
+  --primary: #8ab4f8;
+  --primary-text: #202124;
+  --primary-soft: #394457;
+  --danger-bg: #5c2b29;
+  --danger-border: #8c3a36;
+  --danger-text: #f6aea9;
+  --ok: #81c995;
+  --shadow: rgba(0, 0, 0, 0.35);
+}
+
 /* Global styles */
 * {
   margin: 0;
@@ -10,10 +48,94 @@
 
 body {
   font-family: 'Roboto', 'Segoe UI', Arial, sans-serif;
-  background: #fff;
-  color: #202124;
+  background: var(--bg);
+  color: var(--text);
   font-size: 14px;
   line-height: 1.4286;
+}
+
+input, select, textarea {
+  font-family: inherit;
+  color: var(--text);
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+button {
+  font-family: inherit;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: var(--primary-text);
+  border-color: transparent;
+}
+
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.btn-ghost,
+.ghost {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.danger {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  border-color: var(--danger-border);
+}
+
+.danger-text {
+  color: var(--danger-text);
+}
+
+.actions,
+.panel-actions,
+.filters,
+.safe-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.form-grid + button,
+.form-grid + .actions,
+.form-grid + .panel-actions {
+  margin-top: 12px;
+}
+
+.card,
+.page,
+.add-card,
+.day-block,
+.detail,
+.edit-panel {
+  background: var(--card);
+  color: var(--text);
+}
+
+a {
+  color: var(--primary);
 }
 
 /* Custom calendar event colors - возврат к исходному круглому виду */
@@ -32,34 +154,69 @@ body {
 }
 
 /* Переопределение цветов для более мягкой палитры */
-.cal-month-view .cal-day-cell.cal-today {
-  background-color: #f0f9ff !important;
+.cal-month-view,
+.cal-week-view,
+.cal-day-view {
+  background-color: var(--card) !important;
+  color: var(--text) !important;
+}
+
+.cal-month-view .cal-day-cell,
+.cal-month-view .cal-days,
+.cal-month-view .cal-day-cell:not(:last-child),
+.cal-month-view .cal-days .cal-cell-row,
+.cal-week-view,
+.cal-week-view .cal-day-headers,
+.cal-week-view .cal-day-column,
+.cal-week-view .cal-time-events,
+.cal-week-view .cal-hour-segment {
+  border-color: var(--border) !important;
 }
 
 .cal-month-view .cal-day-cell {
-  border-color: #e5e7eb !important;
+  background-color: var(--card) !important;
 }
 
-.cal-month-view .cal-day-number {
-  color: #374151 !important;
+.cal-month-view .cal-cell-row:hover,
+.cal-month-view .cal-cell-row .cal-cell:hover,
+.cal-week-view .cal-hour-odd,
+.cal-week-view .cal-day-headers .cal-header:hover,
+.cal-week-view .cal-time-events .cal-day-columns:not(.cal-resize-active) .cal-hour-segment:hover {
+  background-color: var(--hover) !important;
+}
+
+.cal-month-view .cal-day-number,
+.cal-week-view .cal-header span,
+.cal-week-view .cal-time {
+  color: var(--text) !important;
+}
+
+.cal-month-view .cal-day-cell.cal-today,
+.cal-week-view .cal-header.cal-today {
+  background-color: var(--primary-soft) !important;
 }
 
 .cal-month-view .cal-day-cell.cal-today .cal-day-number {
-  color: #6366f1 !important;
+  color: var(--primary) !important;
   font-weight: 600 !important;
 }
 
 .cal-month-view .cal-day-cell.cal-weekend {
-  background-color: #fafafa !important;
+  background-color: var(--bg) !important;
+}
+
+.cal-month-view .cal-day-cell.cal-weekend .cal-day-number,
+.cal-week-view .cal-header.cal-weekend span {
+  color: var(--muted) !important;
 }
 
 .cal-month-view .cal-day-cell.cal-out-month {
-  background-color: #f9fafb !important;
-  opacity: 0.5;
+  background-color: var(--bg) !important;
+  opacity: 0.55;
 }
 
 .cal-month-view .cal-day-cell.cal-out-month .cal-day-number {
-  color: #9ca3af !important;
+  color: var(--muted) !important;
 }
 
 /* Скрываем badge с количеством событий - лишнее, так как есть круглые точки */

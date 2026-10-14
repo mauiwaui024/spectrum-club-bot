@@ -1,0 +1,50 @@
+<div class="page">
+  <header class="page-header">
+    <h1>Группы</h1>
+    <p class="hint">Список групп клуба. Действия — в меню справа.</p>
+  </header>
+
+  <p *ngIf="error" class="error">{{ error }}</p>
+  <p *ngIf="message" class="ok">{{ message }}</p>
+  <p *ngIf="loading" class="muted">Загрузка...</p>
+
+  <ul class="list" *ngIf="!loading">
+    <li *ngFor="let g of groups">
+      <div *ngIf="editingId !== g.id" class="row">
+        <div class="main">
+          <strong>{{ g.name }}</strong>
+          <span class="meta">{{ g.code }} · от {{ g.age_min }} лет</span>
+        </div>
+        <div class="kebab" (click)="$event.stopPropagation()">
+          <button type="button" class="kebab-btn" (click)="toggleMenu(g.id, $event)" aria-label="Действия">⋯</button>
+          <div class="kebab-menu" *ngIf="menuOpenId === g.id">
+            <button type="button" (click)="startEdit(g, $event)">Изменить</button>
+            <button type="button" class="danger-text" (click)="deleteGroup(g, $event)">Удалить</button>
+          </div>
+        </div>
+      </div>
+      <div *ngIf="editingId === g.id" class="edit-form">
+        <div class="form-grid">
+          <label>Название <input [(ngModel)]="editName" /></label>
+          <label>Код <input [(ngModel)]="editCode" /></label>
+          <label>Возраст от <input type="number" [(ngModel)]="editAgeMin" /></label>
+        </div>
+        <div class="actions">
+          <button type="button" (click)="saveEdit()">Сохранить</button>
+          <button type="button" class="ghost" (click)="cancelEdit()">Отмена</button>
+        </div>
+      </div>
+    </li>
+    <li *ngIf="!groups.length" class="empty">Групп пока нет</li>
+  </ul>
+
+  <section class="add-card">
+    <h2>Добавить группу</h2>
+    <div class="form-grid">
+      <label>Название <input [(ngModel)]="newName" /></label>
+      <label>Код <input [(ngModel)]="newCode" /></label>
+      <label>Возраст от <input type="number" [(ngModel)]="newAgeMin" /></label>
+    </div>
+    <button type="button" (click)="createGroup()">Добавить</button>
+  </section>
+</div>

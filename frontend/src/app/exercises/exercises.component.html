@@ -1,0 +1,44 @@
+<div class="page">
+  <header class="page-header">
+    <h1>Упражнения</h1>
+    <p class="hint">Список упражнений клуба. В плане тренировки из него выбирают название, а подходы и отдых задают отдельно.</p>
+  </header>
+
+  <p *ngIf="error" class="error">{{ error }}</p>
+  <p *ngIf="message" class="ok">{{ message }}</p>
+  <p *ngIf="loading" class="muted">Загрузка...</p>
+
+  <ul class="list" *ngIf="!loading">
+    <li *ngFor="let ex of exercises">
+      <div *ngIf="editingId !== ex.id" class="row">
+        <div class="main">
+          <strong>{{ ex.name }}</strong>
+          <span class="meta" *ngIf="ex.description">{{ ex.description }}</span>
+        </div>
+        <div class="kebab" (click)="$event.stopPropagation()">
+          <button type="button" class="kebab-btn" (click)="toggleMenu(ex.id, $event)" aria-label="Действия">⋯</button>
+          <div class="kebab-menu" *ngIf="menuOpenId === ex.id">
+            <button type="button" (click)="startEdit(ex, $event)">Изменить</button>
+            <button type="button" class="danger-text" (click)="deleteExercise(ex, $event)">Удалить</button>
+          </div>
+        </div>
+      </div>
+      <div *ngIf="editingId === ex.id" class="edit-form">
+        <label>Название <input [(ngModel)]="editName" /></label>
+        <label>Описание <textarea rows="3" [(ngModel)]="editDescription"></textarea></label>
+        <div class="actions">
+          <button type="button" (click)="saveEdit()">Сохранить</button>
+          <button type="button" class="ghost" (click)="cancelEdit()">Отмена</button>
+        </div>
+      </div>
+    </li>
+    <li *ngIf="!exercises.length" class="empty">Упражнений пока нет</li>
+  </ul>
+
+  <section class="add-card">
+    <h2>Новое упражнение</h2>
+    <label>Название <input [(ngModel)]="newName" /></label>
+    <label>Описание <textarea rows="3" [(ngModel)]="newDescription" placeholder="Можно оставить пустым"></textarea></label>
+    <button type="button" (click)="create()">Добавить</button>
+  </section>
+</div>

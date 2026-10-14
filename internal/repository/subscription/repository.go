@@ -2,6 +2,8 @@ package subscription
 
 import (
 	"fmt"
+	"time"
+
 	"spectrum-club-bot/internal/models"
 	"spectrum-club-bot/internal/repository"
 
@@ -208,7 +210,6 @@ func (r *subscriptionRepository) AddLessons(subscriptionID int64, count int) err
 	query := `
 		UPDATE spectrum.subscriptions
 		SET remaining_lessons = remaining_lessons + $1,
-		    total_lessons = total_lessons + $1,
 		    updated_at = CURRENT_TIMESTAMP
 		WHERE id = $2
 	`
@@ -226,6 +227,25 @@ func (r *subscriptionRepository) AddLessons(subscriptionID int64, count int) err
 		return fmt.Errorf("абонемент с ID %d не найден", subscriptionID)
 	}
 
+	return nil
+}
+
+func (r *subscriptionRepository) SetEndDate(subscriptionID int64, endDate time.Time) error {
+	result, err := r.db.Exec(`
+		UPDATE spectrum.subscriptions
+		SET end_date = $1, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $2
+	`, endDate, subscriptionID)
+	if err != nil {
+		return fmt.Errorf("ошибка при смене срока: %v", err)
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("ошибка при проверке результата: %v", err)
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("абонемент с ID %d не найден", subscriptionID)
+	}
 	return nil
 }
 

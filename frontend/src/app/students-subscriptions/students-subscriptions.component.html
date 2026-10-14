@@ -2,7 +2,6 @@
   <!-- Header -->
   <div class="header">
     <h1>🎫 Абонементы учеников</h1>
-    <a routerLink="/calendar" class="back-link">← Назад к календарю</a>
   </div>
 
   <!-- Loading -->
@@ -10,9 +9,28 @@
 
   <!-- Error -->
   <div *ngIf="error" class="error">{{ error }}</div>
+  <p *ngIf="createMessage" class="ok">{{ createMessage }}</p>
+
+  <div class="create-box">
+    <h3>Добавить абонемент</h3>
+    <select [(ngModel)]="createStudentUserId">
+      <option [ngValue]="null">Выберите ученика</option>
+      <option *ngFor="let s of allStudents" [ngValue]="s.user_id">
+        {{ studentOptionLabel(s) }}
+      </option>
+    </select>
+    <select [(ngModel)]="createCatalogKey" (ngModelChange)="onCatalogChange()">
+      <option *ngFor="let c of catalog" [ngValue]="c.key">{{ c.label }}</option>
+    </select>
+    <label class="end-date">
+      Действует до
+      <input type="date" [(ngModel)]="createEndDate" />
+    </label>
+    <button (click)="createSubscription()">Создать</button>
+  </div>
 
   <!-- Content -->
-  <div *ngIf="!loading && !error && data">
+  <div *ngIf="!loading && data">
     <!-- Students List -->
     <div *ngIf="data.students && data.students.length > 0" class="students-list">
       <div *ngFor="let student of data.students" class="student-card">
@@ -46,6 +64,7 @@
                   <div class="header-actions">
                     <span class="status-badge status-active">Активен</span>
                     <button class="edit-btn" (click)="startEdit(sub); $event.stopPropagation()" title="Редактировать" *ngIf="!isEditing(sub.id)">✏️</button>
+                    <button class="edit-btn" (click)="deleteSubscription(sub); $event.stopPropagation()" title="Удалить" *ngIf="!isEditing(sub.id)">🗑️</button>
                   </div>
                 </div>
                 <div class="card-body" *ngIf="!isEditing(sub.id)">
@@ -111,6 +130,15 @@
                     </div>
                     <div class="form-hint form-hint-warning" *ngIf="sub.remaining_lessons <= -2">
                       Снятие недоступно: достигнут порог -2
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label>Срок действия до:</label>
+                    <div class="input-group">
+                      <input type="date" [(ngModel)]="editEndDate" class="form-input">
+                      <button class="btn btn-primary" (click)="saveEndDate(sub)" [disabled]="saving">
+                        Сохранить срок
+                      </button>
                     </div>
                   </div>
                   <div class="form-actions">

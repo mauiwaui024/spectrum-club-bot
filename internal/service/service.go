@@ -7,6 +7,7 @@ import (
 
 type UserService interface {
 	RegisterOrUpdate(telegramID int64, firstName, lastName, username string, role string) (*models.User, error)
+	CreateWebUser(username, password, firstName, lastName, role string) (*models.User, error)
 	GetUserProfile(telegramID int64) (*models.User, *models.Student, *models.Subscription, *models.Coach, error)
 	SetRole(telegramID int64, role string) error
 	RegisterAsCoach(telegramID int64, specialty, experience, description string) error
@@ -17,15 +18,38 @@ type UserService interface {
 
 	GetByTelegramID(telegramID int64) (*models.User, error)
 	GetByUsername(username string) (*models.User, error)
+	UsernameExists(username string) (bool, error)
 	SetBrowserPassword(userID int64, plainPassword string) error
 	VerifyBrowserPassword(user *models.User, plainPassword string) bool
+	SetActive(userID int64, active bool) error
+	SetRoleByUserID(userID int64, role string) error
+	EnsureCoachProfile(userID int64) error
+	RecordPDConsent(userID int64, policyVersion string) error
+	ListUsersWithoutPassword() ([]*models.User, error)
+	SetUsernameIfEmpty(userID int64, username string) error
 }
 
 type StudentService interface {
 	GetStudentByUserID(userID int64) (*models.Student, error)
 	GetStudentByID(studentID int64) (*models.Student, error)
 	UpdateAthleticTitle(studentID int64, athleticTitle *string) error
+	UpdateCard(studentID int64, groupID *int64, discipline *string, lastGrade *string) error
 	GetStudentWithUser(studentID int64) (*models.Student, *models.User, error)
+}
+
+type PlanService interface {
+	ListTemplates() ([]models.PlanTemplate, error)
+	GetTemplate(id int) (*models.PlanTemplate, error)
+	CreateTemplate(title, description string, items []models.PlanItem) (*models.PlanTemplate, error)
+	UpdateTemplate(id int, title, description string, items []models.PlanItem) error
+	DeleteTemplate(id int) error
+	GetTrainingPlan(trainingID int) (*models.TrainingPlan, error)
+	SaveTrainingPlan(trainingID int, sourceTemplateID *int, description string, items []models.PlanItem) (*models.TrainingPlan, error)
+	ListExercises() ([]models.Exercise, error)
+	GetExercise(id int) (*models.Exercise, error)
+	CreateExercise(name, description string) (*models.Exercise, error)
+	UpdateExercise(id int, name, description string) error
+	DeleteExercise(id int) error
 }
 
 type CoachService interface {
@@ -45,11 +69,13 @@ type SubscriptionService interface {
 	DecrementRemainingLessons(studentID int64) error
 	AddLessons(subscriptionID int64, count int) error
 	RemoveLessons(subscriptionID int64, count int) error
+	SetEndDate(subscriptionID int64, endDate time.Time) error
 
 	////i did
 	Create12Unlimited(studentID int64) error
 	Create16For30Days(studentID int64) error
 	Create1For30Days(studentID int64) error
+	CreateWithEndDate(studentID int64, lessons int, endDate time.Time) error
 
 	GetAll() ([]*models.Subscription, error)
 
@@ -61,6 +87,9 @@ type TrainingGroupService interface {
 	GetAllGroups() ([]models.TrainingGroup, error)
 	GetGroupByID(id int) (*models.TrainingGroup, error)
 	GetGroupsForAge(age int) ([]models.TrainingGroup, error)
+	CreateGroup(group *models.TrainingGroup) error
+	UpdateGroup(id int, updates map[string]interface{}) error
+	DeleteGroup(id int) error
 }
 
 // /////Создание тренировок и шаблонов для тренировок
@@ -91,6 +120,9 @@ type WeekScheduleService interface {
 	CheckTrainingExists(groupID int, startTime time.Time) (bool, error)
 	CreateTrainingsFromTemplates(weekStart time.Time, coachID int64, createdBy int64, weeksCount int) (int, error)
 	GetTemplateByID(id int) (*models.WeekScheduleTemplate, error)
+	GetAllTemplates() ([]models.WeekScheduleTemplate, error)
+	CreateTemplate(template *models.WeekScheduleTemplate) error
+	DeleteTemplate(id int) error
 	UpdateTemplate(id int, updates map[string]interface{}) error
 	DeactivateTemplate(id int) error
 	ActivateTemplate(id int) error
@@ -118,4 +150,5 @@ type AttendanceService interface {
 	GetStudentSchedule(studentID int, start, end time.Time) ([]models.AttendanceWithTraining, error)
 	CreateAttendance(attendance models.Attendance) error
 	CancelAttendance(trainingID, studentID int) error
+	UnmarkAttendance(trainingID, studentID int) error
 }

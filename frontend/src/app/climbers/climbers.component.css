@@ -1,0 +1,19 @@
+.page { max-width: 720px; margin: 0 auto; padding: 16px; color: var(--text); }
+.page-header h1 { margin: 0 0 4px; font-size: 22px; }
+.hint, .muted, .meta { color: var(--muted); font-size: 13px; }
+.hint { margin: 0 0 12px; }
+.error { color: var(--danger-text); }
+.ok { color: var(--ok); }
+.list { list-style: none; padding: 0; margin: 0; border: 1px solid var(--border); border-radius: 8px; background: var(--card); }
+.list li { padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.list li:last-child { border-bottom: none; }
+.list li.self { box-shadow: inset 3px 0 0 var(--primary); }
+.card-body { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+.main { min-width: 0; }
+.meta { display: block; margin-top: 2px; }
+.empty { color: var(--muted); }
+label { display: flex; flex-direction: column; gap: 4px; font-size: 14px; margin: 10px 0; }
+input, select, button { padding: 8px 10px; font-size: 14px; }
+button { cursor: pointer; }
+.actions { display: flex; gap: 8px; }
+.ghost { background: transparent; border: 1px solid var(--border); }

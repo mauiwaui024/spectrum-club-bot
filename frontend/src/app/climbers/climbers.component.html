@@ -1,0 +1,58 @@
+<div class="page">
+  <header class="page-header">
+    <h1>Карточки</h1>
+    <p class="hint">Ученики клуба: группа, дисциплина и последняя категория.</p>
+  </header>
+
+  <p *ngIf="error" class="error">{{ error }}</p>
+  <p *ngIf="message" class="ok">{{ message }}</p>
+  <p *ngIf="loading" class="muted">Загрузка...</p>
+
+  <ul class="list" *ngIf="!loading">
+    <li *ngFor="let c of climbers" [class.self]="c.is_self">
+      <div *ngIf="editingId !== c.student_id" class="card-body">
+        <div class="main">
+          <strong>{{ c.name }}</strong>
+          <span class="meta">
+            {{ c.group_name || 'Группа не указана' }}
+            <span *ngIf="disciplineLabel(c.discipline)"> · {{ disciplineLabel(c.discipline) }}</span>
+            <span *ngIf="c.last_grade"> · {{ c.last_grade }}</span>
+          </span>
+          <span class="meta" *ngIf="c.is_self">
+            Остаток абонемента:
+            {{ c.remaining_lessons == null ? 'нет активного' : c.remaining_lessons }}
+          </span>
+        </div>
+        <button *ngIf="isCoach" type="button" (click)="startEdit(c)">Изменить</button>
+      </div>
+      <div *ngIf="editingId === c.student_id" class="edit-form">
+        <strong>{{ c.name }}</strong>
+        <label>
+          Группа
+          <select [(ngModel)]="editGroupId">
+            <option [ngValue]="null">Не указана</option>
+            <option *ngFor="let g of groups" [ngValue]="g.id">{{ g.name }}</option>
+          </select>
+        </label>
+        <label>
+          Дисциплина
+          <select [(ngModel)]="editDiscipline">
+            <option value="">Не указана</option>
+            <option value="boulder">Боулдер</option>
+            <option value="lead">Трудность</option>
+            <option value="both">Боулдер и трудность</option>
+          </select>
+        </label>
+        <label>
+          Последняя категория
+          <input [(ngModel)]="editGrade" placeholder="6a или V4" />
+        </label>
+        <div class="actions">
+          <button type="button" (click)="saveEdit(c)">Сохранить</button>
+          <button type="button" class="ghost" (click)="cancelEdit()">Отмена</button>
+        </div>
+      </div>
+    </li>
+    <li *ngIf="!climbers.length" class="empty">Учеников пока нет</li>
+  </ul>
+</div>

@@ -78,6 +78,10 @@ export interface TrainingDetails {
     description: string;
     max_participants: number | null;
   };
+  plan?: {
+    description: string;
+    items: { text: string; sets?: number | null; reps?: number | null; rest_seconds?: number | null; exercise_description?: string }[];
+  } | null;
   participants: Participant[];
   participants_count: number;
   is_coach: boolean;

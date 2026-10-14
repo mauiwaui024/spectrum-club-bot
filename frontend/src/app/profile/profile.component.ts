@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CalendarService } from '../services/calendar.service';
 import { MyProfileResponse } from '../models/student.model';
@@ -18,6 +18,8 @@ export class ProfileComponent implements OnInit {
   error: string | null = null;
   isEditing: boolean = false;
   saving: boolean = false;
+  newPassword = '';
+  passwordMessage: string | null = null;
 
   // Form fields for editing
   editFirstName: string = '';
@@ -27,7 +29,7 @@ export class ProfileComponent implements OnInit {
   editExperience: string = '';
   editDescription: string = '';
 
-  constructor(private calendarService: CalendarService) {}
+  constructor(private calendarService: CalendarService, private router: Router) {}
 
   ngOnInit() {
     this.loadProfile();
@@ -141,6 +143,27 @@ export class ProfileComponent implements OnInit {
         this.saving = false;
         console.error('Error updating profile:', err);
       }
+    });
+  }
+
+  setPassword(): void {
+    this.passwordMessage = null;
+    this.error = null;
+    this.calendarService.setBrowserPassword(this.newPassword).subscribe({
+      next: () => {
+        this.passwordMessage = 'Пароль обновлён';
+        this.newPassword = '';
+      },
+      error: (err) => {
+        this.error = err?.error || 'Не удалось задать пароль (мин. 8 символов)';
+      }
+    });
+  }
+
+  logout(): void {
+    this.calendarService.logoutBrowserSession().subscribe({
+      next: () => this.router.navigate(['/login']),
+      error: () => this.router.navigate(['/login'])
     });
   }
 }

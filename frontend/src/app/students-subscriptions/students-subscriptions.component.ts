@@ -4,6 +4,7 @@ import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CalendarService } from '../services/calendar.service';
 import { AllStudentsSubscriptionsResponse, StudentWithSubscriptions, Subscription } from '../models/student.model';
+import { httpErrorMessage } from '../utils/http-error';
 
 @Component({
   selector: 'app-students-subscriptions',
@@ -21,12 +22,93 @@ export class StudentsSubscriptionsComponent implements OnInit {
   editingSubscriptionId: number | null = null;
   addLessonsCount: number = 1;
   removeLessonsCount: number = 1;
+  editEndDate = '';
   saving: boolean = false;
+  allStudents: any[] = [];
+  createStudentUserId: number | null = null;
+  createCatalogKey = 'pack12';
+  createEndDate = '';
+  createMessage: string | null = null;
+
+  readonly catalog: { key: string; label: string; lessons: number; defaultDays: number | 'years2' }[] = [
+    { key: 'single1', label: 'Разовое — 1 посещение', lessons: 1, defaultDays: 30 },
+    { key: 'single2', label: 'Разовое — 2 посещения', lessons: 2, defaultDays: 30 },
+    { key: 'single3', label: 'Разовое — 3 посещения', lessons: 3, defaultDays: 30 },
+    { key: 'single4', label: 'Разовое — 4 посещения', lessons: 4, defaultDays: 30 },
+    { key: 'pack4', label: 'Абонемент на 4', lessons: 4, defaultDays: 30 },
+    { key: 'pack8', label: 'Абонемент на 8', lessons: 8, defaultDays: 30 },
+    { key: 'pack12', label: 'Абонемент на 12', lessons: 12, defaultDays: 'years2' },
+    { key: 'pack16', label: 'Абонемент на 16', lessons: 16, defaultDays: 30 },
+  ];
 
   constructor(private calendarService: CalendarService) {}
 
   ngOnInit() {
+    this.applyDefaultEndDate();
     this.loadData();
+    this.calendarService.getStudents().subscribe({
+      next: (res) => (this.allStudents = res.students || []),
+      error: () => {}
+    });
+  }
+
+  onCatalogChange(): void {
+    this.applyDefaultEndDate();
+  }
+
+  applyDefaultEndDate(): void {
+    const item = this.catalog.find(c => c.key === this.createCatalogKey);
+    const d = new Date();
+    if (item?.defaultDays === 'years2') {
+      d.setFullYear(d.getFullYear() + 2);
+    } else {
+      d.setDate(d.getDate() + (typeof item?.defaultDays === 'number' ? item.defaultDays : 30));
+    }
+    this.createEndDate = this.toDateInput(d);
+  }
+
+  private toDateInput(d: Date): string {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  studentOptionLabel(s: any): string {
+    return s.display_name || [s.last_name, s.first_name].filter(Boolean).join(' ') || s.username || ('#' + s.user_id);
+  }
+
+  createSubscription(): void {
+    if (!this.createStudentUserId) {
+      this.error = 'Выберите ученика';
+      return;
+    }
+    if (!this.createEndDate) {
+      this.error = 'Укажите срок действия';
+      return;
+    }
+    const item = this.catalog.find(c => c.key === this.createCatalogKey);
+    if (!item) {
+      this.error = 'Выберите тип абонемента';
+      return;
+    }
+    this.createMessage = null;
+    this.error = null;
+    this.calendarService.createSubscription(this.createStudentUserId, item.lessons, this.createEndDate).subscribe({
+      next: () => {
+        this.createMessage = 'Абонемент создан';
+        this.loadData();
+      },
+      error: (err) => (this.error = err?.error || 'Не удалось создать абонемент')
+    });
+  }
+
+  deleteSubscription(sub: Subscription): void {
+    if (!confirm('Удалить абонемент #' + sub.id + '?')) return;
+    this.calendarService.deleteSubscription(sub.id).subscribe({
+      next: () => this.loadData(),
+      error: (err) => (this.editError = err?.error || 'Не удалось удалить')
+    });
   }
 
   loadData() {
@@ -124,23 +206,21 @@ export class StudentsSubscriptionsComponent implements OnInit {
     return Math.max(0, sub.remaining_lessons + 2);
   }
 
-  getMaxAddableLessons(sub: Subscription): number {
-    // Определяем максимальный лимит для типа абонемента
-    // Определяем тип по точным значениям или ближайшему нижнему
-    let maxTypeLimit: number;
-    if (sub.total_lessons === 1) {
-      maxTypeLimit = 1;
-    } else if (sub.total_lessons === 12) {
-      maxTypeLimit = 12;
-    } else if (sub.total_lessons === 16) {
-      maxTypeLimit = 16;
-    } else if (sub.total_lessons < 12) {
-      // Между 1 и 12, предполагаем тип 12
-      maxTypeLimit = 12;
-    } else {
-      // >= 13 или > 16, предполагаем тип 16
-      maxTypeLimit = 16;
+  private maxLessonsForType(totalLessons: number): number {
+    const limits = [1, 2, 3, 4, 8, 12, 16];
+    if (limits.includes(totalLessons)) {
+      return totalLessons;
     }
+    for (const limit of limits) {
+      if (totalLessons <= limit) {
+        return limit;
+      }
+    }
+    return 16;
+  }
+
+  getMaxAddableLessons(sub: Subscription): number {
+    const maxTypeLimit = this.maxLessonsForType(sub.total_lessons);
 
     // Максимум, который можно добавить до исходного количества (использованные занятия)
     const maxToOriginal = sub.total_lessons - sub.remaining_lessons;
@@ -177,23 +257,17 @@ export class StudentsSubscriptionsComponent implements OnInit {
   }
 
   getSubscriptionTypeName(sub: Subscription): string {
-    if (sub.total_lessons === 1) {
-      return '1 занятие';
-    } else if (sub.total_lessons === 12) {
-      return '12 занятий - несгораемый';
-    } else if (sub.total_lessons === 16) {
-      return '16 занятий - 30 дней';
-    } else if (sub.total_lessons < 12) {
-      return '12 занятий - несгораемый';
-    } else {
-      return '16 занятий - 30 дней';
-    }
+    const n = sub.total_lessons;
+    if (n === 1) return '1 занятие';
+    if (n >= 2 && n <= 4) return `${n} занятия`;
+    return `${n} занятий`;
   }
 
   startEdit(subscription: Subscription) {
     this.editingSubscriptionId = subscription.id;
     this.addLessonsCount = 1;
     this.removeLessonsCount = 1;
+    this.editEndDate = (subscription.end_date || '').slice(0, 10);
     this.editError = null;
   }
 
@@ -201,6 +275,7 @@ export class StudentsSubscriptionsComponent implements OnInit {
     this.editingSubscriptionId = null;
     this.addLessonsCount = 1;
     this.removeLessonsCount = 1;
+    this.editEndDate = '';
     this.editError = null;
   }
 
@@ -217,15 +292,7 @@ export class StudentsSubscriptionsComponent implements OnInit {
     // Валидация: проверяем максимальное количество, которое можно добавить
     const maxToAdd = this.getMaxAddableLessons(subscription);
     if (this.addLessonsCount > maxToAdd) {
-      // Определяем лимит типа для сообщения об ошибке
-      let maxTypeLimit: number;
-      if (subscription.total_lessons <= 1) {
-        maxTypeLimit = 1;
-      } else if (subscription.total_lessons <= 12) {
-        maxTypeLimit = 12;
-      } else {
-        maxTypeLimit = 16;
-      }
+      const maxTypeLimit = this.maxLessonsForType(subscription.total_lessons);
       this.editError = `Можно добавить максимум ${maxToAdd} занятий (до исходного лимита абонемента ${maxTypeLimit} занятий)`;
       return;
     }
@@ -317,6 +384,35 @@ export class StudentsSubscriptionsComponent implements OnInit {
         this.editError = errorMessage;
         this.saving = false;
         console.error('Error removing lessons:', err);
+      }
+    });
+  }
+
+  saveEndDate(subscription: Subscription) {
+    if (!this.editEndDate) {
+      this.editError = 'Укажите дату окончания';
+      return;
+    }
+    this.saving = true;
+    this.editError = null;
+    this.calendarService.setSubscriptionEndDate(subscription.id, this.editEndDate).subscribe({
+      next: (updatedSub) => {
+        if (this.data) {
+          for (const student of this.data.students) {
+            const subIndex = student.subscriptions.findIndex(s => s.id === subscription.id);
+            if (subIndex !== -1) {
+              student.subscriptions[subIndex] = updatedSub;
+              student.total_lessons_count = this.getTotalLessonsCount(student);
+            }
+          }
+        }
+        this.editingSubscriptionId = null;
+        this.saving = false;
+        this.editError = null;
+      },
+      error: (err) => {
+        this.editError = httpErrorMessage(err, 'Не удалось сохранить срок');
+        this.saving = false;
       }
     });
   }

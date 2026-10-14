@@ -7,12 +7,19 @@ import (
 
 type UserRepository interface {
 	CreateOrUpdate(user *models.User) error
+	CreateWithPassword(user *models.User, passwordHash string) error
 	GetByTelegramID(telegramID int64) (*models.User, error)
 	GetByUsername(username string) (*models.User, error)
+	UsernameExists(username string) (bool, error)
 	GetByID(id int64) (*models.User, error)
 	SetPasswordHash(userID int64, passwordHash string) error
 	UpdateRole(telegramID int64, role string) error
+	UpdateRoleByUserID(userID int64, role string) error
 	UpdateUser(userID int64, firstName, lastName *string) error
+	SetActive(userID int64, active bool) error
+	RecordPDConsent(userID int64, policyVersion string, at time.Time) error
+	ListWithoutPassword() ([]*models.User, error)
+	SetUsernameIfEmpty(userID int64, username string) error
 
 	GetAllStudents() ([]*models.User, error)
 }
@@ -23,6 +30,7 @@ type StudentRepository interface {
 	GetByID(id int64) (*models.Student, error)
 	Update(student *models.Student) error
 	UpdateAthleticTitle(studentID int64, athleticTitle *string) error
+	UpdateCard(studentID int64, groupID *int64, discipline *string, lastGrade *string) error
 }
 
 type CoachRepository interface {
@@ -46,6 +54,7 @@ type SubscriptionRepository interface {
 	DecrementRemainingLessons(studentID int64) error
 	AddLessons(subscriptionID int64, count int) error
 	RemoveLessons(subscriptionID int64, count int) error
+	SetEndDate(subscriptionID int64, endDate time.Time) error
 
 	///
 	GetAll() ([]*models.Subscription, error)
@@ -59,6 +68,10 @@ type TrainingGroupRepository interface {
 	GetAllGroups() ([]models.TrainingGroup, error)
 	GetGroupByID(id int) (*models.TrainingGroup, error)
 	GetGroupByCode(code string) (*models.TrainingGroup, error)
+	Create(group *models.TrainingGroup) error
+	Update(id int, name, code, description string, ageMin int, ageMax *int) error
+	Delete(id int) error
+	CountFutureTrainings(groupID int) (int, error)
 }
 
 type TrainingScheduleRepository interface {
@@ -83,6 +96,7 @@ type TrainingScheduleRepository interface {
 
 type WeekScheduleRepository interface {
 	GetAllActive() ([]models.WeekScheduleTemplate, error)
+	GetAll() ([]models.WeekScheduleTemplate, error)
 	GetByGroupID(groupID int) ([]models.WeekScheduleTemplate, error)
 	GetByID(id int) (*models.WeekScheduleTemplate, error)
 	Create(template *models.WeekScheduleTemplate) error

@@ -66,6 +66,16 @@ func (r *studentRepository) Update(student *models.Student) error {
 	return err
 }
 
+func (r *studentRepository) UpdateCard(studentID int64, groupID *int64, discipline *string, lastGrade *string) error {
+	query := `
+		UPDATE spectrum.students
+		SET group_id = $1, discipline = $2, last_grade = $3, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $4
+	`
+	_, err := r.db.Exec(query, groupID, discipline, lastGrade, studentID)
+	return err
+}
+
 func (r *studentRepository) UpdateAthleticTitle(studentID int64, athleticTitle *string) error {
 	query := `
 		UPDATE spectrum.students 

@@ -1,0 +1,145 @@
+<div class="container">
+  <div class="header">
+    <h1>Управление расписанием</h1>
+    <p class="hint">Шаблоны — в <a routerLink="/schedule-templates">Шаблонах</a>, группы — в <a routerLink="/groups">Группах</a>.</p>
+  </div>
+
+  <p *ngIf="error" class="error">{{ error }}</p>
+  <p *ngIf="message" class="ok">{{ message }}</p>
+
+  <section class="card">
+    <h2>Создать тренировку</h2>
+    <div class="form-grid">
+      <label>
+        Группа
+        <select [(ngModel)]="groupId">
+          <option *ngFor="let g of groups" [ngValue]="g.id">{{ g.name }}</option>
+        </select>
+      </label>
+      <label>
+        Дата
+        <input type="date" [(ngModel)]="date" />
+      </label>
+      <label>
+        Начало
+        <input type="time" [(ngModel)]="startTime" />
+      </label>
+      <label>
+        Конец
+        <input type="time" [(ngModel)]="endTime" />
+      </label>
+      <label class="full">
+        Описание / место
+        <input type="text" [(ngModel)]="description" placeholder="Тенгус (блдр)" />
+      </label>
+    </div>
+    <button (click)="createTraining()">Создать</button>
+  </section>
+
+  <section class="card">
+    <h2>Из шаблонов</h2>
+    <p class="hint">Используются только активные шаблоны. Править их — в <a routerLink="/schedule-templates">Шаблонах</a>.</p>
+    <label>
+      Недель вперёд
+      <select [(ngModel)]="weeksCount">
+        <option [ngValue]="1">1</option>
+        <option [ngValue]="2">2</option>
+        <option [ngValue]="4">4</option>
+        <option [ngValue]="8">8</option>
+      </select>
+    </label>
+    <button (click)="createFromTemplates()">Создать из шаблонов</button>
+  </section>
+
+  <section class="card">
+    <h2>Расписание</h2>
+    <div class="week-nav">
+      <button type="button" class="nav-btn" (click)="prevWeek()" aria-label="Предыдущая неделя">←</button>
+      <div class="week-meta">
+        <span class="week-range">{{ weekLabel }}</span>
+        <button type="button" class="linkish" (click)="goThisWeek()">Сегодня</button>
+      </div>
+      <button type="button" class="nav-btn" (click)="nextWeek()" aria-label="Следующая неделя">→</button>
+    </div>
+
+    <div *ngIf="loading">Загрузка...</div>
+    <div *ngIf="!loading && trainings.length === 0" class="empty">Нет тренировок на этой неделе</div>
+
+    <ul class="list" *ngIf="!loading && trainings.length">
+      <li *ngFor="let t of trainings">
+        <div *ngIf="editingId !== t.id" class="row slot-row">
+          <span class="slot-text">{{ formatSlot(t) }}</span>
+          <div class="kebab" (click)="$event.stopPropagation()">
+            <button type="button" class="kebab-btn" (click)="toggleMenu(t.id, $event)" aria-label="Действия">⋯</button>
+            <div class="kebab-menu" *ngIf="menuOpenId === t.id">
+              <button type="button" (click)="startEdit(t, $event)">Изменить</button>
+              <button type="button" (click)="openPlan(t, $event)">План</button>
+              <button type="button" class="danger-text" (click)="deleteTraining(t.id, $event)">Удалить</button>
+            </div>
+          </div>
+        </div>
+        <div *ngIf="editingId === t.id" class="edit-form">
+          <div class="form-grid">
+            <label>
+              Дата
+              <input type="date" [(ngModel)]="editDate" />
+            </label>
+            <label>
+              Начало
+              <input type="time" [(ngModel)]="editStartTime" />
+            </label>
+            <label>
+              Конец
+              <input type="time" [(ngModel)]="editEndTime" />
+            </label>
+            <label class="full">
+              Описание / место
+              <input type="text" [(ngModel)]="editDescription" />
+            </label>
+          </div>
+          <div class="actions">
+            <button (click)="saveEdit()">Сохранить</button>
+            <button (click)="cancelEdit()">Отмена</button>
+          </div>
+        </div>
+        <div *ngIf="planTrainingId === t.id" class="edit-form plan-form">
+          <label>
+            Заготовка
+            <select [ngModel]="planTemplateId" (ngModelChange)="onPlanTemplatePick($event)">
+              <option [ngValue]="null">Пустой план</option>
+              <option *ngFor="let tpl of planTemplates" [ngValue]="tpl.id">{{ tpl.title }}</option>
+            </select>
+          </label>
+          <label>
+            Описание
+            <textarea rows="3" [(ngModel)]="planDescription"></textarea>
+          </label>
+          <div class="plan-items">
+            <div class="plan-item" *ngFor="let item of planItems; let i = index">
+              <label class="grow" *ngIf="item.legacy">
+                Упражнение
+                <input [value]="item.text" disabled />
+              </label>
+              <label class="grow" *ngIf="!item.legacy">
+                Упражнение
+                <select [(ngModel)]="item.exercise_id">
+                  <option [ngValue]="null">Выберите</option>
+                  <option *ngFor="let ex of exercises" [ngValue]="ex.id">{{ ex.name }}</option>
+                </select>
+              </label>
+              <label>Подходы <input type="number" min="1" [(ngModel)]="item.sets" /></label>
+              <label>Повторения <input type="number" min="1" [(ngModel)]="item.reps" /></label>
+              <label>Отдых, сек <input type="number" min="1" [(ngModel)]="item.rest_seconds" /></label>
+              <button type="button" (click)="removePlanItem(i)" aria-label="Удалить строку">×</button>
+            </div>
+            <button type="button" (click)="addPlanItem()">Добавить упражнение</button>
+          </div>
+          <div class="actions">
+            <button type="button" (click)="savePlan()" [disabled]="planSaving">Сохранить</button>
+            <button type="button" (click)="cancelPlan()">Отмена</button>
+          </div>
+        </div>
+      </li>
+    </ul>
+  </section>
+</div>

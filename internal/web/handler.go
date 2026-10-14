@@ -1,16 +1,10 @@
 package web
 
 import (
-	"bytes"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"sort"
 	"strconv"
@@ -29,10 +23,15 @@ type Handler struct {
 	studentService      service.StudentService
 	userService         service.UserService
 	subscriptionService service.SubscriptionService
-	botToken            string // Для проверки Telegram WebApp initData
+	groupService        service.TrainingGroupService
+	planService         service.PlanService
+	inviteSecret        string
+	baseURL             string
 	allowLegacyUserID   bool
 	sessions            map[string]browserSession
 	sessionsMu          sync.RWMutex
+	usedInviteJTIs      map[string]time.Time
+	usedInviteMu        sync.Mutex
 }
 
 type browserSession struct {
@@ -47,8 +46,13 @@ func NewHandler(
 	studentService service.StudentService,
 	userService service.UserService,
 	subscriptionService service.SubscriptionService,
-	botToken string,
+	groupService service.TrainingGroupService,
+	baseURL string,
 ) *Handler {
+	inviteSecret := os.Getenv("INVITE_SECRET")
+	if inviteSecret == "" {
+		inviteSecret = "spectrum-invite-dev-secret"
+	}
 	return &Handler{
 		scheduleService:     scheduleService,
 		coachService:        coachService,
@@ -56,9 +60,12 @@ func NewHandler(
 		studentService:      studentService,
 		userService:         userService,
 		subscriptionService: subscriptionService,
-		botToken:            botToken,
+		groupService:        groupService,
+		inviteSecret:        inviteSecret,
+		baseURL:             strings.TrimRight(baseURL, "/"),
 		allowLegacyUserID:   strings.ToLower(os.Getenv("ALLOW_LEGACY_USER_ID_FALLBACK")) == "true" || strings.ToLower(os.Getenv("ENVIRONMENT")) != "production",
 		sessions:            make(map[string]browserSession),
+		usedInviteJTIs:      make(map[string]time.Time),
 	}
 }
 
@@ -551,21 +558,9 @@ func (h *Handler) prepareScheduleViewJSON(trainings []models.TrainingSchedule, u
 				// Проверяем, можно ли записаться
 				// Тренировка должна быть в будущем (дата и время начала)
 				if !isRegistered && trainingDateTime.After(time.Now()) {
-					if training.MaxParticipants != nil && *training.MaxParticipants > 0 {
-						maxParticipants := *training.MaxParticipants
-						if len(participants) < maxParticipants {
-							canRegister = true
-						}
-					} else {
-						canRegister = true
-					}
+					canRegister = true
 				}
 			}
-		}
-
-		maxParticipants := 0
-		if training.MaxParticipants != nil {
-			maxParticipants = *training.MaxParticipants
 		}
 
 		grouped[dateKey] = append(grouped[dateKey], TrainingViewJSON{
@@ -576,10 +571,9 @@ func (h *Handler) prepareScheduleViewJSON(trainings []models.TrainingSchedule, u
 			CoachName:        training.CoachName,
 			Participants:     len(participants),
 			ParticipantNames: participantNames,
-			MaxParticipants:  maxParticipants,
 			CanRegister:      canRegister,
 			IsRegistered:     isRegistered,
-			IsFull:           training.MaxParticipants != nil && len(participants) >= *training.MaxParticipants,
+			IsFull:           false,
 			ColorIndex:       h.getColorIndex(training.GroupID),
 		})
 	}
@@ -763,35 +757,23 @@ func (h *Handler) TrainingDetailsAPI(w http.ResponseWriter, r *http.Request) {
 	// userID нужен только для самой записи, но для определения can_register достаточно проверить:
 	// 1. Пользователь - студент (не тренер)
 	// 2. Тренировка в будущем (дата и время начала)
-	// 3. Есть свободные места (если установлен лимит)
-	// 4. Пользователь не записан (если userID передан, иначе считаем что не записан)
+	// 3. Пользователь не записан (если userID передан, иначе считаем что не записан)
 	// Примечание: проверка активного абонемента выполняется в RegisterForTraining,
 	// чтобы пользователь видел кнопку и получал сообщение об ошибке при попытке записи
 	if !isCoach && !isRegistered && trainingDateTime.After(now) {
-		if training.MaxParticipants != nil && *training.MaxParticipants > 0 {
-			maxParticipants := *training.MaxParticipants
-			if len(participants) < maxParticipants {
-				canRegister = true
-			} else {
-				isFull = true
-			}
-		} else {
-			// Если лимита нет, всегда можно записаться (если тренировка в будущем и пользователь - студент)
-			canRegister = true
-		}
+		canRegister = true
 	}
 
 	// Формируем ответ
 	response := map[string]interface{}{
 		"training": map[string]interface{}{
-			"id":               training.ID,
-			"group_name":       training.GroupName,
-			"training_date":    training.TrainingDate.Format("2006-01-02"),
-			"start_time":       training.StartTime.Format("15:04"),
-			"end_time":         training.EndTime.Format("15:04"),
-			"coach_name":       training.CoachName,
-			"description":      training.Description,
-			"max_participants": training.MaxParticipants,
+			"id":            training.ID,
+			"group_name":    training.GroupName,
+			"training_date": training.TrainingDate.Format("2006-01-02"),
+			"start_time":    training.StartTime.Format("15:04"),
+			"end_time":      training.EndTime.Format("15:04"),
+			"coach_name":    training.CoachName,
+			"description":   training.Description,
 		},
 		"participants":        participants,
 		"participants_count":  len(participants),
@@ -803,6 +785,7 @@ func (h *Handler) TrainingDetailsAPI(w http.ResponseWriter, r *http.Request) {
 		"is_full":             isFull,
 		"is_past":             isPast,
 		"current_time":        time.Now().Format(time.RFC3339),
+		"plan":                h.trainingPlanOrNil(trainingID),
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -894,33 +877,9 @@ func (h *Handler) RegisterForTraining(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Проверяем, не прошла ли тренировка
-	// Создаем полную дату и время начала тренировки для правильного сравнения
-	trainingStartTime := time.Date(
-		training.TrainingDate.Year(),
-		training.TrainingDate.Month(),
-		training.TrainingDate.Day(),
-		training.StartTime.Hour(),
-		training.StartTime.Minute(),
-		training.StartTime.Second(),
-		0,
-		training.TrainingDate.Location(),
-	)
-	// Разрешаем запись в течение часа после начала тренировки
-	now := time.Now()
-	deadlineTime := trainingStartTime.Add(1 * time.Hour)
-	if now.After(deadlineTime) {
-		http.Error(w, "Training has already passed", http.StatusBadRequest)
+	if err := errIfTooLateForBooking(training, "Запись"); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
-	}
-
-	// Проверяем, есть ли места
-	participants, err := h.attendanceService.GetParticipants(trainingID)
-	if err == nil && training.MaxParticipants != nil {
-		if len(participants) >= *training.MaxParticipants {
-			http.Error(w, "No available spots", http.StatusBadRequest)
-			return
-		}
 	}
 
 	// Проверяем, не записан ли уже студент
@@ -1006,28 +965,14 @@ func (h *Handler) CancelRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Проверяем, можно ли отменить (например, тренировка еще не прошла)
 	training, err := h.scheduleService.GetTrainingByID(trainingID)
-	if err == nil {
-		// Можно отменить только если тренировка в будущем
-		// Создаем полную дату и время начала тренировки для правильного сравнения
-		trainingStartTime := time.Date(
-			training.TrainingDate.Year(),
-			training.TrainingDate.Month(),
-			training.TrainingDate.Day(),
-			training.StartTime.Hour(),
-			training.StartTime.Minute(),
-			training.StartTime.Second(),
-			0,
-			training.TrainingDate.Location(),
-		)
-		// Разрешаем отмену в течение часа после начала тренировки
-		now := time.Now()
-		deadlineTime := trainingStartTime.Add(1 * time.Hour)
-		if now.After(deadlineTime) {
-			http.Error(w, "Cannot cancel past training", http.StatusBadRequest)
-			return
-		}
+	if err != nil {
+		http.Error(w, "Training not found", http.StatusNotFound)
+		return
+	}
+	if err := errIfTooLateForBooking(training, "Отмена"); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 
 	// Отменяем запись
@@ -1180,8 +1125,6 @@ func (h *Handler) MarkAttendanceAPI(w http.ResponseWriter, r *http.Request) {
 		markedCount++
 		log.Printf("[MarkAttendanceAPI] Посещаемость успешно отмечена для ученика %d", studentID)
 
-		// Отправляем уведомление студенту о списании занятия
-		h.sendLessonDeductionNotification(studentID, requestData.TrainingID)
 	}
 
 	// Формируем ответ с информацией об ошибках
@@ -1248,161 +1191,12 @@ func (h *Handler) CheckRegistration(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// verifyTelegramWebAppData проверяет подлинность Telegram WebApp initData
-// Возвращает telegram_id если данные валидны, иначе ошибку
-func (h *Handler) verifyTelegramWebAppData(initData string) (int64, error) {
-	log.Printf("[verifyTelegramWebAppData] Начало проверки initData, длина: %d", len(initData))
-
-	if h.botToken == "" {
-		log.Printf("[verifyTelegramWebAppData] ОШИБКА: bot token не настроен")
-		return 0, fmt.Errorf("bot token not configured")
-	}
-
-	// Парсим initData
-	parsed, err := url.ParseQuery(initData)
-	if err != nil {
-		log.Printf("[verifyTelegramWebAppData] ОШИБКА: неверный формат initData: %v", err)
-		return 0, fmt.Errorf("invalid initData format: %v", err)
-	}
-
-	log.Printf("[verifyTelegramWebAppData] initData распарсен, параметров: %d", len(parsed))
-
-	// Извлекаем hash и остальные параметры
-	hash := parsed.Get("hash")
-	if hash == "" {
-		log.Printf("[verifyTelegramWebAppData] ОШИБКА: hash не найден в initData")
-		return 0, fmt.Errorf("hash not found in initData")
-	}
-
-	log.Printf("[verifyTelegramWebAppData] hash найден: %s", hash[:min(20, len(hash))]+"...")
-
-	// Удаляем hash из параметров для проверки
-	parsed.Del("hash")
-
-	// Сортируем параметры по ключу
-	keys := make([]string, 0, len(parsed))
-	for k := range parsed {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	// Формируем data-check-string
-	var dataCheckString strings.Builder
-	for i, k := range keys {
-		if i > 0 {
-			dataCheckString.WriteString("\n")
-		}
-		dataCheckString.WriteString(k)
-		dataCheckString.WriteString("=")
-		values := parsed[k]
-		if len(values) > 0 {
-			dataCheckString.WriteString(values[0])
-		}
-	}
-
-	// Вычисляем секретный ключ
-	secretKey := hmac.New(sha256.New, []byte("WebAppData"))
-	secretKey.Write([]byte(h.botToken))
-	secretKeyBytes := secretKey.Sum(nil)
-
-	// Вычисляем HMAC
-	mac := hmac.New(sha256.New, secretKeyBytes)
-	mac.Write([]byte(dataCheckString.String()))
-	expectedHash := hex.EncodeToString(mac.Sum(nil))
-
-	// Сравниваем хеши
-	if hash != expectedHash {
-		return 0, fmt.Errorf("invalid hash: data not from Telegram")
-	}
-
-	// Извлекаем user из user параметра
-	userStr := parsed.Get("user")
-	if userStr == "" {
-		return 0, fmt.Errorf("user not found in initData")
-	}
-
-	// Парсим JSON user
-	var userData struct {
-		ID int64 `json:"id"`
-	}
-	if err := json.Unmarshal([]byte(userStr), &userData); err != nil {
-		return 0, fmt.Errorf("invalid user data: %v", err)
-	}
-
-	return userData.ID, nil
-}
-
-// min возвращает минимальное из двух чисел
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-// AuthAPI проверяет Telegram WebApp initData и возвращает userID из базы
-func (h *Handler) AuthAPI(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	// Получаем initData из заголовка или тела запроса
-	initData := r.Header.Get("X-Telegram-Init-Data")
-	if initData == "" {
-		// Пробуем получить из тела запроса
-		if err := r.ParseForm(); err == nil {
-			initData = r.FormValue("initData")
-		}
-	}
-
-	if initData == "" {
-		http.Error(w, "Missing initData", http.StatusBadRequest)
-		return
-	}
-
-	// Проверяем initData и получаем telegram_id
-	telegramID, err := h.verifyTelegramWebAppData(initData)
-	if err != nil {
-		http.Error(w, "Invalid initData: "+err.Error(), http.StatusUnauthorized)
-		return
-	}
-
-	// Находим user в базе по telegram_id
-	user, err := h.userService.GetByTelegramID(telegramID)
-	if err != nil {
-		http.Error(w, "User not found: "+err.Error(), http.StatusNotFound)
-		return
-	}
-
-	// Возвращаем userID
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"user_id":     user.ID,
-		"telegram_id": telegramID,
-	})
-}
-
-// getUserIDFromRequest извлекает userID через initData или browser session cookie.
+// getUserIDFromRequest извлекает userID через browser session cookie (или legacy user_id).
 func (h *Handler) getUserIDFromRequest(r *http.Request) (int64, error) {
-	// 1) Telegram WebApp initData
-	initData := r.Header.Get("X-Telegram-Init-Data")
-	if initData != "" {
-		telegramID, err := h.verifyTelegramWebAppData(initData)
-		if err == nil {
-			user, err := h.userService.GetByTelegramID(telegramID)
-			if err == nil {
-				return user.ID, nil
-			}
-		}
-	}
-
-	// 2) Browser session cookie
 	if userID, ok := h.getUserIDFromSession(r); ok {
 		return userID, nil
 	}
 
-	// 3) Legacy fallback for non-production or explicit opt-in
 	if h.allowLegacyUserID {
 		userIDStr := r.URL.Query().Get("user_id")
 		if userIDStr != "" {
@@ -1414,79 +1208,6 @@ func (h *Handler) getUserIDFromRequest(r *http.Request) (int64, error) {
 	}
 
 	return 0, fmt.Errorf("user not authenticated")
-}
-
-// sendLessonDeductionNotification отправляет уведомление студенту о списании занятия
-func (h *Handler) sendLessonDeductionNotification(studentID int, trainingID int) {
-	// studentID - это ID из таблицы students
-	student, err := h.studentService.GetStudentByID(int64(studentID))
-	if err != nil {
-		log.Printf("[sendLessonDeductionNotification] Ошибка получения студента %d: %v", studentID, err)
-		return
-	}
-
-	// Получаем пользователя по userID студента
-	user, err := h.userService.GetByID(student.UserID)
-	if err != nil {
-		log.Printf("[sendLessonDeductionNotification] Ошибка получения пользователя для studentID %d: %v", studentID, err)
-		return
-	}
-
-	// Получаем информацию о тренировке
-	training, err := h.scheduleService.GetTrainingByID(trainingID)
-	if err != nil {
-		log.Printf("[sendLessonDeductionNotification] Ошибка получения тренировки %d: %v", trainingID, err)
-		return
-	}
-
-	// Получаем информацию об абонементе
-	subscription, err := h.subscriptionService.GetActiveSubscription(student.ID)
-	remainingLessons := 0
-	if err == nil && subscription != nil {
-		remainingLessons = subscription.RemainingLessons
-	}
-
-	// Формируем сообщение
-	msgText := fmt.Sprintf(
-		"✅ *Посещаемость отмечена!*\n\n"+
-			"📅 *Тренировка:* %s\n"+
-			"🕐 *Дата:* %s\n"+
-			"👥 *Группа:* %s\n\n"+
-			"🎫 *Осталось занятий:* %d",
-		training.StartTime.Format("15:04"),
-		training.TrainingDate.Format("02.01.2006"),
-		training.GroupName,
-		remainingLessons,
-	)
-
-	// Отправляем сообщение через Telegram Bot API
-	apiURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", h.botToken)
-	requestData := map[string]interface{}{
-		"chat_id":    user.TelegramID,
-		"text":       msgText,
-		"parse_mode": "Markdown",
-	}
-
-	requestJSON, err := json.Marshal(requestData)
-	if err != nil {
-		log.Printf("[sendLessonDeductionNotification] Ошибка маршалинга JSON: %v", err)
-		return
-	}
-
-	resp, err := http.Post(apiURL, "application/json", bytes.NewBuffer(requestJSON))
-	if err != nil {
-		log.Printf("[sendLessonDeductionNotification] Ошибка отправки уведомления: %v", err)
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		log.Printf("[sendLessonDeductionNotification] Ошибка Telegram API: %s", string(body))
-		return
-	}
-
-	log.Printf("[sendLessonDeductionNotification] Уведомление успешно отправлено студенту %d (telegramID: %d)", studentID, user.TelegramID)
 }
 
 // MyRegistrationsAPI возвращает список записей ученика на тренировки
@@ -1522,9 +1243,9 @@ func (h *Handler) MyRegistrationsAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Получаем записи на тренировки за последние 30 дней и будущие
+	// Записи: прошедший месяц и ближайшие 90 дней
 	start := time.Now().AddDate(0, 0, -30)
-	end := time.Now().AddDate(0, 0, 30)
+	end := time.Now().AddDate(0, 0, 90)
 
 	attendances, err := h.attendanceService.GetAttendanceByStudent(int(student.ID), start, end)
 	if err != nil {
@@ -1532,33 +1253,29 @@ func (h *Handler) MyRegistrationsAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Группируем записи по дате и статусу
-	var upcomingTrainings []map[string]interface{}
-	var pastTrainings []map[string]interface{}
+	upcomingTrainings := make([]map[string]interface{}, 0)
+	pastTrainings := make([]map[string]interface{}, 0)
 
 	now := time.Now()
 	for _, attendance := range attendances {
 		training, err := h.scheduleService.GetTrainingByID(attendance.TrainingID)
-		if err != nil {
+		if err != nil || training == nil {
 			continue
 		}
 
-		// Получаем название группы
 		groupName := training.GroupName
 		if groupName == "" {
 			groupName = "Неизвестная группа"
 		}
 
-		// Получаем тренера
-		coachName := "Неизвестный тренер"
-		if training.CoachID != nil {
-			coach, err := h.coachService.GetByCoachID(*training.CoachID)
-			if err == nil && coach != nil {
-				coachUser, err := h.userService.GetByID(coach.UserID)
-				if err == nil && coachUser != nil {
-					coachName = coachUser.FirstName + " " + coachUser.LastName
-				}
-			}
+		coachName := training.CoachName
+		if coachName == "" {
+			coachName = "Неизвестный тренер"
+		}
+
+		status := attendance.Status
+		if status == "" {
+			status = "registered"
 		}
 
 		trainingData := map[string]interface{}{
@@ -1570,25 +1287,23 @@ func (h *Handler) MyRegistrationsAPI(w http.ResponseWriter, r *http.Request) {
 			"group_name":    groupName,
 			"coach_name":    coachName,
 			"description":   training.Description,
-			"status":        attendance.Status,
+			"status":        status,
 			"attended":      attendance.Attended,
 			"notes":         attendance.Notes,
 		}
 
-		if training.TrainingDate.After(now) {
+		// Предстоящие — пока не закончилась тренировка (дата+время), не только date > now
+		if !trainingEndTime(training).Before(now) && status == "registered" && !attendance.Attended {
 			upcomingTrainings = append(upcomingTrainings, trainingData)
 		} else {
 			pastTrainings = append(pastTrainings, trainingData)
 		}
 	}
 
-	response := map[string]interface{}{
+	h.writeJSON(w, http.StatusOK, map[string]interface{}{
 		"upcoming": upcomingTrainings,
 		"past":     pastTrainings,
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	})
 }
 
 // MySubscriptionAPI возвращает информацию об абонементе ученика
@@ -1978,7 +1693,7 @@ func (h *Handler) AllStudentsSubscriptionsAPI(w http.ResponseWriter, r *http.Req
 			studentData := map[string]interface{}{
 				"user_id":             studentUser.ID,
 				"student_id":          student.ID,
-				"name":                studentUser.FirstName + " " + studentUser.LastName,
+				"name":                formatStudentDisplayName(studentUser),
 				"subscriptions":       subscriptionData,
 				"total_lessons_count": totalLessonsCount,
 			}
@@ -2177,5 +1892,80 @@ func (h *Handler) RemoveLessonsAPI(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"message": "Lessons removed successfully",
+	})
+}
+
+// SetSubscriptionEndDateAPI меняет дату окончания абонемента (только для тренеров).
+func (h *Handler) SetSubscriptionEndDateAPI(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		h.sendJSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	userID, err := h.getUserIDFromRequest(r)
+	if err != nil {
+		h.sendJSONError(w, http.StatusUnauthorized, "Authentication required")
+		return
+	}
+	user, err := h.userService.GetByID(userID)
+	if err != nil {
+		h.sendJSONError(w, http.StatusBadRequest, "User not found: "+err.Error())
+		return
+	}
+	if user.Role != "coach" {
+		h.sendJSONError(w, http.StatusForbidden, "Access denied: only coaches can modify subscriptions")
+		return
+	}
+
+	var requestData struct {
+		SubscriptionID int64  `json:"subscription_id"`
+		EndDate        string `json:"end_date"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
+		h.sendJSONError(w, http.StatusBadRequest, "Invalid JSON: "+err.Error())
+		return
+	}
+	endDate, err := time.ParseInLocation("2006-01-02", strings.TrimSpace(requestData.EndDate), time.Local)
+	if err != nil {
+		h.sendJSONError(w, http.StatusBadRequest, "invalid end_date, use YYYY-MM-DD")
+		return
+	}
+	if err := h.subscriptionService.SetEndDate(requestData.SubscriptionID, endDate); err != nil {
+		h.sendJSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	allSubs, err := h.subscriptionService.GetAll()
+	if err == nil {
+		now := time.Now()
+		for _, sub := range allSubs {
+			if sub.ID != requestData.SubscriptionID {
+				continue
+			}
+			status := "active"
+			if sub.EndDate.Before(now) || sub.EndDate.Equal(now) {
+				status = "expired"
+			} else if sub.RemainingLessons < -2 {
+				status = "used"
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"id":                sub.ID,
+				"total_lessons":     sub.TotalLessons,
+				"remaining_lessons": sub.RemainingLessons,
+				"used_lessons":      sub.TotalLessons - sub.RemainingLessons,
+				"start_date":        sub.StartDate.Format("2006-01-02"),
+				"end_date":          sub.EndDate.Format("2006-01-02"),
+				"created_at":        sub.CreatedAt.Format("2006-01-02"),
+				"status":            status,
+			})
+			return
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": "End date updated",
 	})
 }

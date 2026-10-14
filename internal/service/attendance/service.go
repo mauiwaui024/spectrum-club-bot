@@ -39,21 +39,15 @@ func (s *attendanceService) SignUpForTraining(studentID, trainingID int) error {
 	if err != nil {
 		return err
 	}
-
-	if training.MaxParticipants != nil {
-		currentCount, err := s.scheduleRepo.GetTrainingParticipantsCount(trainingID)
-		if err != nil {
-			return err
-		}
-		if currentCount >= *training.MaxParticipants {
-			return errors.New("нет свободных мест на тренировку")
-		}
+	if training == nil {
+		return errors.New("тренировка не найдена")
 	}
 
 	attendance := &models.Attendance{
 		TrainingID: trainingID,
 		StudentID:  studentID,
 		Attended:   false,
+		Status:     "registered",
 		RecordedAt: time.Now(),
 	}
 
@@ -169,4 +163,29 @@ func (s *attendanceService) CreateAttendance(attendance models.Attendance) error
 
 func (s *attendanceService) CancelAttendance(trainingID, studentID int) error {
 	return s.attendanceRepo.CancelAttendance(trainingID, studentID)
+}
+
+func (s *attendanceService) UnmarkAttendance(trainingID, studentID int) error {
+	attendance, err := s.attendanceRepo.GetStudentAttendanceForTraining(studentID, trainingID)
+	if err != nil {
+		return fmt.Errorf("ошибка получения записи посещаемости: %w", err)
+	}
+	if attendance == nil {
+		return errors.New("студент не записан на эту тренировку")
+	}
+	if !attendance.Attended && attendance.Status != "attended" {
+		return errors.New("посещаемость ещё не была отмечена")
+	}
+
+	attendance.Attended = false
+	attendance.Status = "registered"
+	if err := s.attendanceRepo.UpdateAttendance(attendance); err != nil {
+		return err
+	}
+
+	sub, err := s.subscriptionService.GetActiveSubscription(int64(studentID))
+	if err == nil && sub != nil {
+		_ = s.subscriptionService.AddLessons(sub.ID, 1)
+	}
+	return nil
 }

@@ -2,7 +2,6 @@
   <!-- Header -->
   <div class="header">
     <h1>👤 Личный кабинет</h1>
-    <a routerLink="/calendar" class="back-link">← Назад к календарю</a>
   </div>
 
   <!-- Loading -->
@@ -160,26 +159,19 @@
       </div>
     </div>
 
-    <div class="quick-links">
-      <!-- For students -->
-      <a *ngIf="isStudent()" routerLink="/my-registrations" class="quick-link">
-        <span class="icon">📅</span>
-        <span class="text">Мои записи</span>
-      </a>
-      <a *ngIf="isStudent()" routerLink="/my-subscription" class="quick-link">
-        <span class="icon">🎫</span>
-        <span class="text">Мой абонемент</span>
-      </a>
-      <!-- For coaches -->
-      <a *ngIf="isCoach()" routerLink="/students-subscriptions" class="quick-link">
-        <span class="icon">🎫</span>
-        <span class="text">Абонементы учеников</span>
-      </a>
-      <!-- For both -->
-      <a routerLink="/calendar" class="quick-link">
-        <span class="icon">📆</span>
-        <span class="text">Календарь</span>
-      </a>
+    <div class="profile-card" style="margin-top: 16px;">
+      <div class="section">
+        <h3>🔐 Пароль</h3>
+        <div class="form-grid">
+          <input type="password" [(ngModel)]="newPassword" placeholder="Новый пароль (мин. 8)" />
+          <button class="btn btn-primary" (click)="setPassword()" [disabled]="!newPassword">Сохранить пароль</button>
+        </div>
+        <p *ngIf="passwordMessage" class="ok">{{ passwordMessage }}</p>
+      </div>
+      <div class="section">
+        <button class="btn btn-secondary" (click)="logout()">Выйти</button>
+      </div>
     </div>
+
   </div>
 </div>

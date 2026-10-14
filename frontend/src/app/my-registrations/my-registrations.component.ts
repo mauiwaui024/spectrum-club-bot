@@ -28,7 +28,10 @@ export class MyRegistrationsComponent implements OnInit {
     
     this.calendarService.getMyRegistrations().subscribe({
       next: (data) => {
-        this.registrations = data;
+        this.registrations = {
+          upcoming: data?.upcoming || [],
+          past: data?.past || []
+        };
         this.loading = false;
       },
       error: (err) => {
@@ -40,7 +43,11 @@ export class MyRegistrationsComponent implements OnInit {
   }
 
   formatDate(dateStr: string): string {
-    const date = new Date(dateStr);
+    // Парсим YYYY-MM-DD как локальную дату, без сдвига UTC
+    const parts = (dateStr || '').split('-').map(Number);
+    const date = parts.length === 3
+      ? new Date(parts[0], parts[1] - 1, parts[2])
+      : new Date(dateStr);
     const days = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
     const dayName = days[date.getDay()];
     const day = date.getDate().toString().padStart(2, '0');

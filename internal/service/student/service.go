@@ -29,6 +29,10 @@ func (s *studentService) UpdateAthleticTitle(studentID int64, athleticTitle *str
 	return s.studentRepo.UpdateAthleticTitle(studentID, athleticTitle)
 }
 
+func (s *studentService) UpdateCard(studentID int64, groupID *int64, discipline *string, lastGrade *string) error {
+	return s.studentRepo.UpdateCard(studentID, groupID, discipline, lastGrade)
+}
+
 func (s *studentService) GetStudentWithUser(studentID int64) (*models.Student, *models.User, error) {
 	// Этот метод будет полезен когда нам нужно получить студента вместе с данными пользователя
 	// Пока заглушка - в реальной реализации нужно будет добавить соответствующий метод в репозиторий

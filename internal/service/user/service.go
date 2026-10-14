@@ -5,10 +5,10 @@ import (
 	"crypto/subtle"
 	"encoding/hex"
 	"fmt"
-	"strings"
 	"spectrum-club-bot/internal/models"
 	"spectrum-club-bot/internal/repository"
 	"spectrum-club-bot/internal/service"
+	"strings"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -33,6 +33,90 @@ func NewUserService(
 		coachRepo:        coachRepo,
 		subscriptionRepo: subscriptionRepo,
 	}
+}
+
+func (s *userService) UsernameExists(username string) (bool, error) {
+	return s.userRepo.UsernameExists(strings.TrimSpace(username))
+}
+
+// CreateWebUser создаёт пользователя без Telegram: dummy telegram_id + password_hash.
+func (s *userService) CreateWebUser(username, password, firstName, lastName, role string) (*models.User, error) {
+	username = strings.TrimSpace(username)
+	firstName = strings.TrimSpace(firstName)
+	lastName = strings.TrimSpace(lastName)
+	role = strings.TrimSpace(role)
+
+	if username == "" {
+		return nil, fmt.Errorf("username is required")
+	}
+	if role != "student" && role != "coach" {
+		return nil, fmt.Errorf("role must be student or coach")
+	}
+	if len(strings.TrimSpace(password)) < 8 {
+		return nil, fmt.Errorf("password must be at least 8 characters")
+	}
+
+	exists, err := s.userRepo.UsernameExists(username)
+	if err != nil {
+		return nil, err
+	}
+	if exists {
+		return nil, fmt.Errorf("username already taken")
+	}
+
+	passwordHashBytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, err
+	}
+
+	// UNIQUE NOT NULL telegram_id: отрицательный синтетический id вне диапазона Telegram.
+	dummyTelegramID := -time.Now().UnixNano()
+	if dummyTelegramID >= 0 {
+		dummyTelegramID = -dummyTelegramID - 1
+	}
+
+	user := &models.User{
+		TelegramID:   dummyTelegramID,
+		FirstName:    firstName,
+		LastName:     lastName,
+		Username:     username,
+		Role:         role,
+		IsActive:     true,
+		RegisteredAt: time.Now(),
+	}
+
+	if err := s.userRepo.CreateWithPassword(user, string(passwordHashBytes)); err != nil {
+		return nil, err
+	}
+
+	student := &models.Student{
+		UserID:    user.ID,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	if err := s.studentRepo.Create(student); err != nil {
+		return nil, err
+	}
+
+	if role == "coach" {
+		if err := s.userRepo.UpdateRoleByUserID(user.ID, "coach"); err != nil {
+			return nil, err
+		}
+		user.Role = "coach"
+		coach := &models.Coach{
+			UserID:      user.ID,
+			Specialty:   "Скалолазание",
+			Experience:  "",
+			Description: "",
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
+		}
+		if err := s.coachRepo.Create(coach); err != nil {
+			return nil, err
+		}
+	}
+
+	return user, nil
 }
 
 func (s *userService) RegisterOrUpdate(telegramID int64, firstName, lastName, username string, role string) (*models.User, error) {
@@ -160,6 +244,60 @@ func (s *userService) SetBrowserPassword(userID int64, plainPassword string) err
 		return err
 	}
 	return s.userRepo.SetPasswordHash(userID, string(passwordHashBytes))
+}
+
+func (s *userService) SetActive(userID int64, active bool) error {
+	return s.userRepo.SetActive(userID, active)
+}
+
+func (s *userService) SetRoleByUserID(userID int64, role string) error {
+	role = strings.TrimSpace(role)
+	if role != "student" && role != "coach" {
+		return fmt.Errorf("role must be student or coach")
+	}
+	return s.userRepo.UpdateRoleByUserID(userID, role)
+}
+
+func (s *userService) ListUsersWithoutPassword() ([]*models.User, error) {
+	return s.userRepo.ListWithoutPassword()
+}
+
+func (s *userService) SetUsernameIfEmpty(userID int64, username string) error {
+	username = strings.TrimSpace(username)
+	if username == "" {
+		return fmt.Errorf("укажите логин")
+	}
+	exists, err := s.userRepo.UsernameExists(username)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return fmt.Errorf("username already taken")
+	}
+	return s.userRepo.SetUsernameIfEmpty(userID, username)
+}
+
+func (s *userService) RecordPDConsent(userID int64, policyVersion string) error {
+	if policyVersion != models.PDPolicyVersion {
+		return fmt.Errorf("неизвестная версия политики")
+	}
+	return s.userRepo.RecordPDConsent(userID, policyVersion, time.Now())
+}
+
+func (s *userService) EnsureCoachProfile(userID int64) error {
+	existing, err := s.coachRepo.GetByUserID(userID)
+	if err == nil && existing != nil {
+		return nil
+	}
+	coach := &models.Coach{
+		UserID:      userID,
+		Specialty:   "Скалолазание",
+		Experience:  "",
+		Description: "",
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+	return s.coachRepo.Create(coach)
 }
 
 func (s *userService) VerifyBrowserPassword(user *models.User, plainPassword string) bool {

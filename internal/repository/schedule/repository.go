@@ -43,10 +43,10 @@ func (r *trainingScheduleRepository) GetTrainingByID(id int) (*models.TrainingSc
 	query := `
 		SELECT 
 			ts.id, ts.group_id, ts.coach_id, ts.training_date, ts.start_time, 
-			ts.end_time, ts.description, ts.max_participants, ts.created_by,
+			ts.end_time, COALESCE(ts.description, ''), ts.max_participants, ts.created_by,
 			ts.created_at, ts.updated_at,
-			tg.name as group_name,
-			u.first_name || ' ' || u.last_name as coach_name
+			COALESCE(tg.name, ''),
+			COALESCE(NULLIF(TRIM(BOTH FROM COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), '')
 		FROM spectrum.training_schedule ts
 		LEFT JOIN spectrum.training_groups tg ON ts.group_id = tg.id
 		LEFT JOIN spectrum.coaches c ON ts.coach_id = c.id
@@ -244,9 +244,6 @@ func (r *trainingScheduleRepository) GetAvailableTrainingsForStudent(studentID i
 		LEFT JOIN spectrum.users u ON c.user_id = u.id
 		WHERE ts.training_date BETWEEN $1 AND $2
 		AND ts.training_date >= CURRENT_DATE
-		AND (ts.max_participants IS NULL OR ts.max_participants > (
-			SELECT COUNT(*) FROM spectrum.attendance a WHERE a.training_id = ts.id
-		))
 		AND NOT EXISTS (
 			SELECT 1 FROM spectrum.attendance a 
 			WHERE a.training_id = ts.id AND a.student_id = $3

@@ -5,29 +5,55 @@
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
 }
 
+.create-box {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 20px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.create-box h3 {
+  width: 100%;
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+
+.create-box select,
+.create-box button,
+.create-box input[type="date"] {
+  padding: 8px 10px;
+  font-size: 14px;
+}
+
+.create-box .end-date {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.ok {
+  color: #15803d;
+  margin-bottom: 12px;
+}
+
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 30px;
   padding-bottom: 15px;
-  border-bottom: 2px solid #e0e0e0;
+  border-bottom: 2px solid var(--border);
 }
 
 .header h1 {
   margin: 0;
   font-size: 24px;
-  color: #3c4043;
-}
-
-.back-link {
-  color: #1a73e8;
-  text-decoration: none;
-  font-size: 14px;
-}
-
-.back-link:hover {
-  text-decoration: underline;
+  color: var(--text);
 }
 
 .loading, .error {
@@ -47,8 +73,8 @@
 }
 
 .student-card {
-  background: #fff;
-  border: 1px solid #e0e0e0;
+  background: var(--card);
+  border: 1px solid var(--border);
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   overflow: hidden;
@@ -60,12 +86,12 @@
   align-items: center;
   padding: 20px;
   cursor: pointer;
-  background: #f8f9fa;
+  background: var(--hover);
   transition: background 0.2s;
 }
 
 .student-header:hover {
-  background: #e9ecef;
+  background: var(--border);
 }
 
 .student-info {
@@ -77,7 +103,7 @@
 .student-info h3 {
   margin: 0;
   font-size: 18px;
-  color: #3c4043;
+  color: var(--text);
 }
 
 .student-meta {
@@ -89,31 +115,31 @@
 
 .subscriptions-count {
   font-size: 14px;
-  color: #5f6368;
+  color: var(--muted);
 }
 
 .lessons-count {
   font-size: 14px;
-  color: #1a73e8;
+  color: var(--primary);
   font-weight: 500;
 }
 
 .subscription-types {
   font-size: 14px;
-  color: #5f6368;
+  color: var(--muted);
   font-style: italic;
 }
 
 .expand-icon {
   font-size: 14px;
-  color: #5f6368;
+  color: var(--muted);
   user-select: none;
 }
 
 .subscriptions-container {
   padding: 20px;
-  border-top: 1px solid #e0e0e0;
-  background: #fff;
+  border-top: 1px solid var(--border);
+  background: var(--card);
 }
 
 .subscriptions-section {
@@ -126,10 +152,10 @@
 
 .subscriptions-section h4 {
   font-size: 16px;
-  color: #3c4043;
+  color: var(--text);
   margin-bottom: 15px;
   padding-bottom: 8px;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--border);
 }
 
 .subscriptions-list {
@@ -139,8 +165,8 @@
 }
 
 .subscription-card {
-  background: #fff;
-  border: 1px solid #e0e0e0;
+  background: var(--card);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 20px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
@@ -192,7 +218,7 @@
 .card-header h5 {
   margin: 0;
   font-size: 16px;
-  color: #3c4043;
+  color: var(--text);
 }
 
 .status-badge {
@@ -208,8 +234,8 @@
 }
 
 .status-badge.status-expired {
-  background: #f5f5f5;
-  color: #616161;
+  background: var(--hover);
+  color: var(--muted);
 }
 
 .card-body {
@@ -233,18 +259,18 @@
 .count-large {
   font-size: 32px;
   font-weight: 600;
-  color: #1a73e8;
+  color: var(--primary);
 }
 
 .count-label {
   font-size: 14px;
-  color: #5f6368;
+  color: var(--muted);
 }
 
 .progress-bar {
   width: 100%;
   height: 8px;
-  background: #e0e0e0;
+  background: var(--border);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -269,13 +295,13 @@
 
 .info-item .label {
   font-size: 12px;
-  color: #5f6368;
+  color: var(--muted);
   font-weight: 500;
 }
 
 .info-item .value {
   font-size: 14px;
-  color: #3c4043;
+  color: var(--text);
 }
 
 .empty-state {
@@ -285,13 +311,13 @@
 
 .empty-state p {
   font-size: 16px;
-  color: #5f6368;
+  color: var(--muted);
   margin-bottom: 10px;
 }
 
 .edit-form {
   padding: 20px;
-  background: #f8f9fa;
+  background: var(--hover);
   border-radius: 8px;
   margin-top: 15px;
 }
@@ -309,7 +335,7 @@
 .edit-form h4 {
   margin: 0 0 20px 0;
   font-size: 16px;
-  color: #3c4043;
+  color: var(--text);
 }
 
 .form-group {
@@ -319,7 +345,7 @@
 .form-group label {
   display: block;
   font-weight: 500;
-  color: #5f6368;
+  color: var(--muted);
   margin-bottom: 8px;
   font-size: 14px;
 }
@@ -336,14 +362,14 @@
   border: 1px solid #dadce0;
   border-radius: 4px;
   font-size: 16px;
-  color: #3c4043;
+  color: var(--text);
   box-sizing: border-box;
   max-width: 150px;
 }
 
 .form-input:focus {
   outline: none;
-  border-color: #1a73e8;
+  border-color: var(--primary);
   box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.1);
 }
 
@@ -365,9 +391,9 @@
 }
 
 .btn-primary {
-  background-color: #1a73e8;
+  background-color: var(--primary);
   color: white;
-  border-color: #1a73e8;
+  border-color: var(--primary);
 }
 
 .btn-primary:hover:not(:disabled) {
@@ -376,23 +402,23 @@
 }
 
 .btn-secondary {
-  background-color: #f0f0f0;
-  color: #3c4043;
-  border-color: #e0e0e0;
+  background-color: var(--hover);
+  color: var(--text);
+  border-color: var(--border);
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background-color: #e0e0e0;
+  background-color: var(--border);
 }
 
 .btn-cancel {
   background-color: transparent;
-  color: #5f6368;
-  border-color: #dadce0;
+  color: var(--muted);
+  border-color: var(--border);
 }
 
 .btn-cancel:hover:not(:disabled) {
-  background-color: #f5f5f5;
+  background-color: var(--hover);
 }
 
 .btn:disabled {
@@ -402,7 +428,7 @@
 
 .form-hint {
   font-size: 12px;
-  color: #5f6368;
+  color: var(--muted);
   margin-top: 4px;
   padding-left: 2px;
 }

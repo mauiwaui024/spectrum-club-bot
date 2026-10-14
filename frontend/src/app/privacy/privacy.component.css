@@ -1,0 +1,15 @@
+.page { max-width: 720px; margin: 0 auto; padding: 24px 16px 48px; color: var(--text); }
+h1 { margin: 0 0 8px; font-size: 24px; }
+h2 { margin: 24px 0 8px; font-size: 18px; }
+p { margin: 0 0 10px; line-height: 1.45; }
+a { color: var(--primary); }
+code { font-size: 0.95em; }
+.close {
+  margin-top: 20px;
+  padding: 8px 14px;
+  cursor: pointer;
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}

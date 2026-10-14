@@ -1,0 +1,184 @@
+<div class="app-shell">
+  <header class="top-bar">
+    <button
+      type="button"
+      class="menu-toggle"
+      aria-label="Открыть меню"
+      [attr.aria-expanded]="menuOpen"
+      (click)="toggleMenu()">
+      <span class="menu-toggle-bar"></span>
+      <span class="menu-toggle-bar"></span>
+      <span class="menu-toggle-bar"></span>
+    </button>
+
+    <a routerLink="/calendar" class="brand" (click)="closeMenu()">
+      <img [src]="logoSrc" alt="Spectrum Club" class="brand-logo" />
+    </a>
+
+    <button type="button" class="theme-toggle" (click)="toggleTheme()" [attr.aria-label]="theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'">
+      {{ theme === 'dark' ? '☀️' : '🌙' }}
+    </button>
+
+    <nav class="desktop-nav" aria-label="Основное меню">
+      <a routerLink="/calendar" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: false }" class="nav-link">
+        <span class="nav-icon">📅</span>
+        <span class="nav-text">Календарь</span>
+      </a>
+      <ng-container *ngIf="!isCoach">
+        <a routerLink="/my-registrations" routerLinkActive="active" class="nav-link">
+          <span class="nav-icon">📝</span>
+          <span class="nav-text">Мои записи</span>
+        </a>
+        <a routerLink="/my-subscription" routerLinkActive="active" class="nav-link">
+          <span class="nav-icon">🎫</span>
+          <span class="nav-text">Абонемент</span>
+        </a>
+      </ng-container>
+      <ng-container *ngIf="isCoach">
+        <a routerLink="/students-subscriptions" routerLinkActive="active" class="nav-link">
+          <span class="nav-icon">🎫</span>
+          <span class="nav-text">Абонементы</span>
+        </a>
+        <a routerLink="/students" routerLinkActive="active" class="nav-link">
+          <span class="nav-icon">👥</span>
+          <span class="nav-text">Ученики</span>
+        </a>
+        <a routerLink="/schedule-manage" routerLinkActive="active" class="nav-link">
+          <span class="nav-icon">🗓️</span>
+          <span class="nav-text">Расписание</span>
+        </a>
+        <a routerLink="/schedule-templates" routerLinkActive="active" class="nav-link">
+          <span class="nav-icon">📋</span>
+          <span class="nav-text">Шаблоны</span>
+        </a>
+        <a routerLink="/training-plans" routerLinkActive="active" class="nav-link">
+          <span class="nav-icon">📝</span>
+          <span class="nav-text">Планы</span>
+        </a>
+        <a routerLink="/exercises" routerLinkActive="active" class="nav-link">
+          <span class="nav-icon">🏋️</span>
+          <span class="nav-text">Упражнения</span>
+        </a>
+        <a routerLink="/groups" routerLinkActive="active" class="nav-link">
+          <span class="nav-icon">🏷️</span>
+          <span class="nav-text">Группы</span>
+        </a>
+        <a routerLink="/analytics" routerLinkActive="active" class="nav-link">
+          <span class="nav-icon">📊</span>
+          <span class="nav-text">Аналитика</span>
+        </a>
+        <a routerLink="/invite" routerLinkActive="active" class="nav-link">
+          <span class="nav-icon">🔗</span>
+          <span class="nav-text">Пригласить</span>
+        </a>
+      </ng-container>
+      <a routerLink="/climbers" routerLinkActive="active" class="nav-link">
+        <span class="nav-icon">🧗</span>
+        <span class="nav-text">Карточки</span>
+      </a>
+      <a routerLink="/profile" routerLinkActive="active" class="nav-link">
+        <span class="nav-icon">👤</span>
+        <span class="nav-text">Профиль</span>
+      </a>
+      <button type="button" class="nav-link theme-nav" (click)="toggleTheme()" [attr.aria-label]="theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'">
+        <span class="nav-icon">{{ theme === 'dark' ? '☀️' : '🌙' }}</span>
+      </button>
+    </nav>
+  </header>
+
+  <div class="drawer-backdrop" *ngIf="menuOpen" (click)="closeMenu()"></div>
+
+  <aside class="drawer" [class.open]="menuOpen" aria-label="Мобильное меню">
+    <div class="drawer-header">
+      <a routerLink="/calendar" class="brand" (click)="closeMenu()">
+        <img [src]="logoSrc" alt="Spectrum Club" class="brand-logo" />
+      </a>
+      <button type="button" class="drawer-close" aria-label="Закрыть меню" (click)="closeMenu()">×</button>
+    </div>
+    <nav class="drawer-nav">
+      <a routerLink="/calendar" routerLinkActive="active" class="nav-link" (click)="closeMenu()">
+        <span class="nav-icon">📅</span>
+        <span class="nav-text">Календарь</span>
+      </a>
+      <ng-container *ngIf="!isCoach">
+        <a routerLink="/my-registrations" routerLinkActive="active" class="nav-link" (click)="closeMenu()">
+          <span class="nav-icon">📝</span>
+          <span class="nav-text">Мои записи</span>
+        </a>
+        <a routerLink="/my-subscription" routerLinkActive="active" class="nav-link" (click)="closeMenu()">
+          <span class="nav-icon">🎫</span>
+          <span class="nav-text">Абонемент</span>
+        </a>
+      </ng-container>
+      <ng-container *ngIf="isCoach">
+        <a routerLink="/students-subscriptions" routerLinkActive="active" class="nav-link" (click)="closeMenu()">
+          <span class="nav-icon">🎫</span>
+          <span class="nav-text">Абонементы учеников</span>
+        </a>
+        <a routerLink="/students" routerLinkActive="active" class="nav-link" (click)="closeMenu()">
+          <span class="nav-icon">👥</span>
+          <span class="nav-text">Ученики</span>
+        </a>
+        <a routerLink="/schedule-manage" routerLinkActive="active" class="nav-link" (click)="closeMenu()">
+          <span class="nav-icon">🗓️</span>
+          <span class="nav-text">Расписание</span>
+        </a>
+        <a routerLink="/schedule-templates" routerLinkActive="active" class="nav-link" (click)="closeMenu()">
+          <span class="nav-icon">📋</span>
+          <span class="nav-text">Шаблоны</span>
+        </a>
+        <a routerLink="/training-plans" routerLinkActive="active" class="nav-link" (click)="closeMenu()">
+          <span class="nav-icon">📝</span>
+          <span class="nav-text">Планы</span>
+        </a>
+        <a routerLink="/exercises" routerLinkActive="active" class="nav-link" (click)="closeMenu()">
+          <span class="nav-icon">🏋️</span>
+          <span class="nav-text">Упражнения</span>
+        </a>
+        <a routerLink="/groups" routerLinkActive="active" class="nav-link" (click)="closeMenu()">
+          <span class="nav-icon">🏷️</span>
+          <span class="nav-text">Группы</span>
+        </a>
+        <a routerLink="/analytics" routerLinkActive="active" class="nav-link" (click)="closeMenu()">
+          <span class="nav-icon">📊</span>
+          <span class="nav-text">Аналитика</span>
+        </a>
+        <a routerLink="/invite" routerLinkActive="active" class="nav-link" (click)="closeMenu()">
+          <span class="nav-icon">🔗</span>
+          <span class="nav-text">Пригласить</span>
+        </a>
+      </ng-container>
+      <a routerLink="/climbers" routerLinkActive="active" class="nav-link" (click)="closeMenu()">
+        <span class="nav-icon">🧗</span>
+        <span class="nav-text">Карточки</span>
+      </a>
+      <a routerLink="/profile" routerLinkActive="active" class="nav-link" (click)="closeMenu()">
+        <span class="nav-icon">👤</span>
+        <span class="nav-text">Профиль</span>
+      </a>
+      <button type="button" class="nav-link theme-nav" (click)="toggleTheme()" [attr.aria-label]="theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'">
+        <span class="nav-icon">{{ theme === 'dark' ? '☀️' : '🌙' }}</span>
+      </button>
+    </nav>
+  </aside>
+
+  <main class="shell-main">
+    <router-outlet></router-outlet>
+  </main>
+  <footer class="shell-footer" *ngIf="showFooter">
+    <a routerLink="/privacy">Политика обработки персональных данных</a>
+  </footer>
+  <app-cookie-notice></app-cookie-notice>
+  <div class="consent-gate" *ngIf="needsConsent">
+    <div class="consent-card">
+      <h2>Обработка персональных данных</h2>
+      <p>Чтобы пользоваться приложением, подтвердите согласие отдельно от других действий.</p>
+      <label class="consent">
+        <input type="checkbox" [(ngModel)]="pdAccepted" />
+        <span>Согласен на обработку персональных данных. <a routerLink="/privacy">Политика</a></span>
+      </label>
+      <p *ngIf="consentError" class="error">{{ consentError }}</p>
+      <button type="button" (click)="acceptConsent()" [disabled]="!pdAccepted || consentSaving">Продолжить</button>
+    </div>
+  </div>
+</div>

@@ -6,6 +6,9 @@ import { LOCALE_ID } from '@angular/core';
 import { registerLocaleData, I18nPluralPipe } from '@angular/common';
 import localeRu from '@angular/common/locales/ru';
 import { routes } from './app/app.routes';
+import { applyTheme, readTheme } from './app/theme';
+
+applyTheme(readTheme());
 import { CalendarModule, DateAdapter } from 'angular-calendar';
 import { adapterFactory } from 'angular-calendar/date-adapters/date-fns';
 

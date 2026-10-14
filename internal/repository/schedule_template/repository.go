@@ -20,7 +20,9 @@ func NewWeekScheduleRepository(db *sqlx.DB) repository.WeekScheduleRepository {
 
 func (r *weekScheduleRepository) GetAllActive() ([]models.WeekScheduleTemplate, error) {
 	query := `
-        SELECT id, group_id, day_of_week, start_time, end_time, 
+        SELECT id, group_id, day_of_week,
+               to_char(start_time, 'HH24:MI:SS') AS start_time,
+               to_char(end_time, 'HH24:MI:SS') AS end_time,
                description, is_active, created_at, updated_at
         FROM spectrum.week_schedule_templates
         WHERE is_active = TRUE
@@ -49,9 +51,40 @@ func (r *weekScheduleRepository) GetAllActive() ([]models.WeekScheduleTemplate, 
 	return templates, nil
 }
 
+func (r *weekScheduleRepository) GetAll() ([]models.WeekScheduleTemplate, error) {
+	query := `
+        SELECT id, group_id, day_of_week,
+               to_char(start_time, 'HH24:MI:SS') AS start_time,
+               to_char(end_time, 'HH24:MI:SS') AS end_time,
+               description, is_active, created_at, updated_at
+        FROM spectrum.week_schedule_templates
+        ORDER BY day_of_week, start_time
+    `
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var templates []models.WeekScheduleTemplate
+	for rows.Next() {
+		var t models.WeekScheduleTemplate
+		if err := rows.Scan(
+			&t.ID, &t.GroupID, &t.DayOfWeek, &t.StartTime, &t.EndTime,
+			&t.Description, &t.IsActive, &t.CreatedAt, &t.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		templates = append(templates, t)
+	}
+	return templates, nil
+}
+
 func (r *weekScheduleRepository) GetByGroupID(groupID int) ([]models.WeekScheduleTemplate, error) {
 	query := `
-        SELECT id, group_id, day_of_week, start_time, end_time, 
+        SELECT id, group_id, day_of_week,
+               to_char(start_time, 'HH24:MI:SS') AS start_time,
+               to_char(end_time, 'HH24:MI:SS') AS end_time,
                description, is_active, created_at, updated_at
         FROM spectrum.week_schedule_templates
         WHERE group_id = $1 AND is_active = TRUE
@@ -82,7 +115,9 @@ func (r *weekScheduleRepository) GetByGroupID(groupID int) ([]models.WeekSchedul
 
 func (r *weekScheduleRepository) GetByID(id int) (*models.WeekScheduleTemplate, error) {
 	query := `
-        SELECT id, group_id, day_of_week, start_time, end_time, 
+        SELECT id, group_id, day_of_week,
+               to_char(start_time, 'HH24:MI:SS') AS start_time,
+               to_char(end_time, 'HH24:MI:SS') AS end_time,
                description, is_active, created_at, updated_at
         FROM spectrum.week_schedule_templates
         WHERE id = $1

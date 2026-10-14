@@ -171,21 +171,14 @@ func (s *trainingScheduleService) CreateTrainingsFromTemplates(
 				continue
 			}
 
-			// Получаем информацию о группе
-			group, err := s.groupRepo.GetGroupByID(template.GroupID)
-			if err != nil {
-				// Используем дефолтное описание если группа не найдена
-				group = &models.TrainingGroup{Name: "Неизвестная группа"}
-			}
-
-			// Создаем тренировку
+			// Создаем тренировку (место из шаблона; название группы — в group_name)
 			training := &models.TrainingSchedule{
 				GroupID:      template.GroupID,
 				CoachID:      &coachID,
 				TrainingDate: trainingStart,
 				StartTime:    trainingStart,
 				EndTime:      trainingEnd,
-				Description:  fmt.Sprintf("%s - %s", template.Description, group.Name),
+				Description:  template.Description,
 				CreatedBy:    &createdBy,
 			}
 
@@ -207,6 +200,18 @@ func (s *trainingScheduleService) CreateTrainingsFromTemplates(
 // GetTemplateByID возвращает шаблон по ID
 func (s *trainingScheduleService) GetTemplateByID(id int) (*models.WeekScheduleTemplate, error) {
 	return s.weekScheduleRepo.GetByID(id)
+}
+
+func (s *trainingScheduleService) GetAllTemplates() ([]models.WeekScheduleTemplate, error) {
+	return s.weekScheduleRepo.GetAll()
+}
+
+func (s *trainingScheduleService) CreateTemplate(template *models.WeekScheduleTemplate) error {
+	return s.weekScheduleRepo.Create(template)
+}
+
+func (s *trainingScheduleService) DeleteTemplate(id int) error {
+	return s.weekScheduleRepo.Delete(id)
 }
 
 // UpdateTemplate обновляет шаблон (частичное обновление через COALESCE)

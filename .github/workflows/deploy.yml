@@ -52,16 +52,12 @@ jobs:
         DB_USER=${{ secrets.DB_USER }}
         DB_PASSWORD=${{ secrets.DB_PASSWORD }}
         DB_NAME=${{ secrets.DB_NAME }}
-        BOT_TOKEN=${{ secrets.BOT_TOKEN }}
         DB_SSL_MODE=disable
         LOG_LEVEL=info
-        BOT_DEBUG=false
         ENVIRONMENT=${{ secrets.ENVIRONMENT }}
         BASE_URL=${{ secrets.BASE_URL }}
+        INVITE_SECRET=${{ secrets.INVITE_SECRET }}
         IMAGE_TAG=${{ github.sha }}
-        HTTPS_PROXY=${{ secrets.HTTPS_PROXY }}
-        HTTP_PROXY=${{ secrets.HTTP_PROXY }}
-        NO_PROXY=${{ secrets.NO_PROXY }}
         EOF
         
         echo "✅ .env file created"

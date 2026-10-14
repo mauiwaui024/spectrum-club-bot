@@ -19,10 +19,14 @@ func NewAttendanceRepository(db *sqlx.DB) repository.AttendanceRepository {
 }
 
 func (r *attendanceRepository) CreateAttendance(attendance *models.Attendance) error {
+	status := attendance.Status
+	if status == "" {
+		status = "registered"
+	}
 	query := `
 		INSERT INTO spectrum.attendance 
-		(training_id, student_id, attended, notes, recorded_by)
-		VALUES ($1, $2, $3, $4, $5)
+		(training_id, student_id, attended, notes, recorded_by, status)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id, recorded_at
 	`
 	return r.db.QueryRow(
@@ -32,6 +36,7 @@ func (r *attendanceRepository) CreateAttendance(attendance *models.Attendance) e
 		attendance.Attended,
 		attendance.Notes,
 		attendance.RecordedBy,
+		status,
 	).Scan(&attendance.ID, &attendance.RecordedAt)
 }
 
@@ -101,17 +106,16 @@ func (r *attendanceRepository) GetAttendanceByTraining(trainingID int) ([]models
 func (r *attendanceRepository) GetAttendanceByStudent(studentID int, start, end time.Time) ([]models.Attendance, error) {
 	query := `
 		SELECT 
-			a.id, a.training_id, a.student_id, a.attended, a.notes, 
-			a.recorded_by, a.recorded_at,
-			u.first_name || ' ' || u.last_name as student_name,
-			ts.training_date, ts.start_time, ts.end_time,
-			tg.name as group_name
+			a.id, a.training_id, a.student_id, COALESCE(a.attended, FALSE), COALESCE(a.notes, ''), 
+			a.recorded_by, a.recorded_at, COALESCE(a.status, 'registered'),
+			COALESCE(NULLIF(TRIM(BOTH FROM COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), '')
 		FROM spectrum.attendance a
 		JOIN spectrum.students s ON a.student_id = s.id
 		JOIN spectrum.users u ON s.user_id = u.id
 		JOIN spectrum.training_schedule ts ON a.training_id = ts.id
-		JOIN spectrum.training_groups tg ON ts.group_id = tg.id
-		WHERE a.student_id = $1 AND ts.training_date BETWEEN $2 AND $3
+		WHERE a.student_id = $1
+		  AND a.status IS DISTINCT FROM 'cancelled'
+		  AND ts.training_date BETWEEN $2 AND $3
 		ORDER BY ts.training_date DESC, ts.start_time DESC
 	`
 
@@ -121,23 +125,17 @@ func (r *attendanceRepository) GetAttendanceByStudent(studentID int, start, end 
 	}
 	defer rows.Close()
 
-	var attendances []models.Attendance
+	attendances := make([]models.Attendance, 0)
 	for rows.Next() {
 		var attendance models.Attendance
-		var trainingDate time.Time
-		var startTime, endTime time.Time
-		var groupName string
-
 		err := rows.Scan(
 			&attendance.ID, &attendance.TrainingID, &attendance.StudentID,
 			&attendance.Attended, &attendance.Notes, &attendance.RecordedBy,
-			&attendance.RecordedAt, &attendance.StudentName,
-			&trainingDate, &startTime, &endTime, &groupName,
+			&attendance.RecordedAt, &attendance.Status, &attendance.StudentName,
 		)
 		if err != nil {
 			return nil, err
 		}
-
 		attendances = append(attendances, attendance)
 	}
 
@@ -218,7 +216,7 @@ func (r *attendanceRepository) UpdateAttendance(attendance *models.Attendance) e
 			attended = $1::boolean,
 			status = CASE 
 				WHEN $1 = true THEN 'attended'
-				ELSE status
+				ELSE 'registered'
 			END,
 			notes = COALESCE(NULLIF($2, ''), notes),
 			recorded_by = COALESCE($3, recorded_by),
