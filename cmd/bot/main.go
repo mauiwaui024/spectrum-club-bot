@@ -11,6 +11,7 @@ import (
 	"spectrum-club-bot/internal/repository/coach"
 	"spectrum-club-bot/internal/repository/group"
 	planrepo "spectrum-club-bot/internal/repository/plan"
+	"spectrum-club-bot/internal/repository/refresh"
 	"spectrum-club-bot/internal/repository/schedule"
 	"spectrum-club-bot/internal/repository/schedule_template"
 	"spectrum-club-bot/internal/repository/student"
@@ -21,11 +22,13 @@ import (
 	group_serivce "spectrum-club-bot/internal/service/group"
 	plan_service "spectrum-club-bot/internal/service/plan"
 	schedule_service "spectrum-club-bot/internal/service/schedule"
+	session_service "spectrum-club-bot/internal/service/session"
 	student_service "spectrum-club-bot/internal/service/student"
 	subscription_service "spectrum-club-bot/internal/service/subscription"
 	user_service "spectrum-club-bot/internal/service/user"
 	"spectrum-club-bot/internal/web"
 	database "spectrum-club-bot/pkg"
+	"strings"
 	"syscall"
 	"time"
 
@@ -62,6 +65,14 @@ func main() {
 	trainingGroupService := group_serivce.NewTrainingGroupService(trainingGroupRepo)
 	attendanceService := attendance_service.NewAttendanceService(attendanceRepo, scheduleRepo, subscriptionService, coachService, studentService, userService)
 	scheduleService := schedule_service.NewScheduleService(scheduleRepo, attendanceRepo, templateScheduleRepos, trainingGroupRepo)
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		if strings.EqualFold(cfg.Environment, "production") {
+			log.Fatal("JWT_SECRET is required when ENVIRONMENT=production")
+		}
+		jwtSecret = "spectrum-jwt-dev-secret"
+	}
+	sessionService := session_service.NewSessionService(refresh.NewRefreshTokenRepository(db), userRepo, jwtSecret)
 
 	calendarHandler := web.NewHandler(
 		scheduleService,
@@ -71,6 +82,7 @@ func main() {
 		userService,
 		subscriptionService,
 		trainingGroupService,
+		sessionService,
 		cfg.BaseURL,
 	)
 	calendarHandler.SetPlanService(plan_service.NewPlanService(planrepo.NewRepository(db)))

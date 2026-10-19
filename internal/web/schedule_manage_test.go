@@ -11,9 +11,9 @@ import (
 
 func TestGroupsAPI(t *testing.T) {
 	h, _, _, _ := testHandler(1)
-	token := withCoachSession(h, 1)
+	access, refresh := withCoachSession(h, 1)
 	req := httptest.NewRequest(http.MethodGet, "/api/groups", nil)
-	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: token})
+	addAuthCookies(req, access, refresh)
 	rr := httptest.NewRecorder()
 	h.GroupsAPI(rr, req)
 	if rr.Code != http.StatusOK {
@@ -29,11 +29,11 @@ func TestGroupsAPI(t *testing.T) {
 
 func TestCreateTrainingAPI_OK(t *testing.T) {
 	h, _, _, sched := testHandler(1)
-	token := withCoachSession(h, 1)
+	access, refresh := withCoachSession(h, 1)
 	body := `{"group_id":1,"date":"2030-06-01","start_time":"10:00","end_time":"11:30","description":"скалодром"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/trainings", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: token})
+	addAuthCookies(req, access, refresh)
 	rr := httptest.NewRecorder()
 	h.TrainingsAPI(rr, req)
 	if rr.Code != http.StatusOK {
@@ -49,11 +49,11 @@ func TestCreateTrainingAPI_OK(t *testing.T) {
 
 func TestCreateTrainingAPI_EndBeforeStart(t *testing.T) {
 	h, _, _, _ := testHandler(1)
-	token := withCoachSession(h, 1)
+	access, refresh := withCoachSession(h, 1)
 	body := `{"group_id":1,"date":"2030-06-01","start_time":"12:00","end_time":"11:00"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/trainings", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: token})
+	addAuthCookies(req, access, refresh)
 	rr := httptest.NewRecorder()
 	h.TrainingsAPI(rr, req)
 	if rr.Code != http.StatusBadRequest {
@@ -63,7 +63,7 @@ func TestCreateTrainingAPI_EndBeforeStart(t *testing.T) {
 
 func TestPatchAndDeleteTrainingAPI(t *testing.T) {
 	h, _, _, sched := testHandler(1)
-	token := withCoachSession(h, 1)
+	access, refresh := withCoachSession(h, 1)
 	coachID := int64(5)
 	tr := &models.TrainingSchedule{
 		ID:          1,
@@ -77,7 +77,7 @@ func TestPatchAndDeleteTrainingAPI(t *testing.T) {
 	patchBody := `{"description":"new desc"}`
 	patchReq := httptest.NewRequest(http.MethodPatch, "/api/trainings/1", strings.NewReader(patchBody))
 	patchReq.Header.Set("Content-Type", "application/json")
-	patchReq.AddCookie(&http.Cookie{Name: sessionCookieName, Value: token})
+	addAuthCookies(patchReq, access, refresh)
 	patchRR := httptest.NewRecorder()
 	h.TrainingByIDAPI(patchRR, patchReq)
 	if patchRR.Code != http.StatusOK {
@@ -88,7 +88,7 @@ func TestPatchAndDeleteTrainingAPI(t *testing.T) {
 	}
 
 	delReq := httptest.NewRequest(http.MethodDelete, "/api/trainings/1", nil)
-	delReq.AddCookie(&http.Cookie{Name: sessionCookieName, Value: token})
+	addAuthCookies(delReq, access, refresh)
 	delRR := httptest.NewRecorder()
 	h.TrainingByIDAPI(delRR, delReq)
 	if delRR.Code != http.StatusOK {
@@ -101,11 +101,11 @@ func TestPatchAndDeleteTrainingAPI(t *testing.T) {
 
 func TestTrainingsFromTemplatesAPI(t *testing.T) {
 	h, _, _, _ := testHandler(1)
-	token := withCoachSession(h, 1)
+	access, refresh := withCoachSession(h, 1)
 	body := `{"weeks_count":2}`
 	req := httptest.NewRequest(http.MethodPost, "/api/trainings/from-templates", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: token})
+	addAuthCookies(req, access, refresh)
 	rr := httptest.NewRecorder()
 	h.TrainingByIDAPI(rr, req)
 	if rr.Code != http.StatusOK {

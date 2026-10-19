@@ -57,10 +57,10 @@ func TestInviteVerify_Expired(t *testing.T) {
 
 func TestCreateInviteAPI_CoachOnly(t *testing.T) {
 	h, _, _, _ := testHandler(1)
-	h.sessions["stu"] = browserSession{UserID: 2, ExpiresAt: time.Now().Add(time.Hour)}
+	stuAccess, stuRefresh, _ := h.sessionService.IssueSession(2)
 	req := httptest.NewRequest(http.MethodPost, "/api/invites", strings.NewReader(`{"role":"student"}`))
 	req.Header.Set("Content-Type", "application/json")
-	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "stu"})
+	addAuthCookies(req, stuAccess, stuRefresh)
 	rr := httptest.NewRecorder()
 	h.CreateInviteAPI(rr, req)
 	if rr.Code != http.StatusForbidden {
@@ -70,11 +70,11 @@ func TestCreateInviteAPI_CoachOnly(t *testing.T) {
 
 func TestCreateInviteAndRegisterFlow(t *testing.T) {
 	h, users, _, _ := testHandler(1)
-	token := withCoachSession(h, 1)
+	access, refresh := withCoachSession(h, 1)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/invites", strings.NewReader(`{"role":"student","ttl_hours":24}`))
 	req.Header.Set("Content-Type", "application/json")
-	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: token})
+	addAuthCookies(req, access, refresh)
 	rr := httptest.NewRecorder()
 	h.CreateInviteAPI(rr, req)
 	if rr.Code != http.StatusOK {

@@ -109,8 +109,8 @@
           
           <div *ngIf="selectedTraining.participants && selectedTraining.participants.length > 0" 
                id="modalAttendanceSection" style="margin-top: 20px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-              <h4 style="margin: 0; color: #3c4043;">Записавшиеся:</h4>
+            <div class="attendance-header">
+              <h4>Записавшиеся:</h4>
               <button 
                 *ngIf="selectedTraining.can_mark_attendance && !isSelectingAttendance"
                 class="modal-btn modal-btn-secondary"
@@ -127,26 +127,26 @@
               </button>
             </div>
          <div class="attendance-list">
-           <div *ngFor="let participant of selectedTraining.participants" class="attendance-item"
-                [style.background-color]="isSelectingAttendance && isStudentSelected(participant.student_id) ? '#e8f5e9' : (isAlreadyAttended(participant) ? '#f0f0f0' : 'transparent')"
-                [style.opacity]="isAlreadyAttended(participant) ? '0.7' : '1'">
-             <div *ngIf="isSelectingAttendance && !isAlreadyAttended(participant)" style="margin-right: 10px;">
+           <div *ngFor="let participant of selectedTraining.participants"
+                class="attendance-item"
+                [class.selected]="isSelectingAttendance && isStudentSelected(participant.student_id)"
+                [class.attended]="isAlreadyAttended(participant)">
+             <div *ngIf="isSelectingAttendance && !isAlreadyAttended(participant)" class="attendance-check">
                <input
                  type="checkbox"
                  [checked]="isStudentSelected(participant.student_id)"
-                 (change)="toggleStudentSelection(participant.student_id)"
-                 style="width: 18px; height: 18px; cursor: pointer;">
+                 (change)="toggleStudentSelection(participant.student_id)">
              </div>
-             <div *ngIf="isSelectingAttendance && isAlreadyAttended(participant)" style="margin-right: 10px; color: #4caf50; font-weight: bold;">
+             <div *ngIf="isSelectingAttendance && isAlreadyAttended(participant)" class="attendance-check ok-mark">
                ✓
              </div>
              <div class="attendance-avatar">
                {{ participant.student_name ? participant.student_name.charAt(0).toUpperCase() : '?' }}
              </div>
-             <div style="flex: 1;">
+             <div class="attendance-meta">
                <div class="attendance-name">
                  {{ participant.student_name || 'Неизвестный' }}
-                 <span *ngIf="isAlreadyAttended(participant)" style="color: #4caf50; font-weight: bold; margin-left: 8px;">✓ Отмечено</span>
+                 <span *ngIf="isAlreadyAttended(participant)" class="ok-mark attended-label">✓ Отмечено</span>
                </div>
                <div class="attendance-time">Записан: {{ formatDateTime(participant.created_at) }}</div>
              </div>
@@ -169,7 +169,7 @@
             <div *ngIf="coachSignupOpen" style="margin-top: 10px;">
               <input [(ngModel)]="coachSignupQuery" placeholder="Имя" style="width: 100%; padding: 8px; margin-bottom: 8px;" />
               <p *ngIf="coachSignupError" style="color: #b91c1c;">{{ coachSignupError }}</p>
-              <p *ngIf="!filteredSignupStudents().length" style="color: #5f6368;">Некого записать</p>
+              <p *ngIf="!filteredSignupStudents().length" class="muted-hint">Некого записать</p>
               <button
                 type="button"
                 class="modal-btn modal-btn-primary"
@@ -221,7 +221,7 @@
             <!-- Для остальных случаев -->
             <div *ngIf="!selectedTraining.can_register && !selectedTraining.is_registered && !selectedTraining.can_mark_attendance">
               <button class="modal-btn modal-btn-secondary" (click)="closeModal()">Закрыть</button>
-              <span style="color: #5f6368; padding: 10px;">
+              <span class="muted-hint modal-hint">
                 <span *ngIf="selectedTraining.is_coach && !selectedTraining.is_training_coach">Только ученики могут записываться на тренировки.</span>
                 <span *ngIf="!selectedTraining.is_coach">
                   Невозможно записаться

@@ -11,10 +11,10 @@ import (
 func TestPasswordLinkSetsPasswordOnExistingUser(t *testing.T) {
 	h, users, _, _ := testHandler(1)
 	users.usersByID[2].IsActive = true
-	session := withCoachSession(h, 1)
+	access, refresh := withCoachSession(h, 1)
 
 	listReq := httptest.NewRequest(http.MethodGet, "/api/users/without-password", nil)
-	listReq.AddCookie(&http.Cookie{Name: sessionCookieName, Value: session})
+	addAuthCookies(listReq, access, refresh)
 	listRR := httptest.NewRecorder()
 	h.UsersWithoutPasswordAPI(listRR, listReq)
 	if listRR.Code != http.StatusOK {
@@ -24,7 +24,7 @@ func TestPasswordLinkSetsPasswordOnExistingUser(t *testing.T) {
 	body, _ := json.Marshal(map[string]interface{}{"user_id": 2, "ttl_hours": 24})
 	createReq := httptest.NewRequest(http.MethodPost, "/api/password-links", bytes.NewReader(body))
 	createReq.Header.Set("Content-Type", "application/json")
-	createReq.AddCookie(&http.Cookie{Name: sessionCookieName, Value: session})
+	addAuthCookies(createReq, access, refresh)
 	createRR := httptest.NewRecorder()
 	h.PasswordLinksAPI(createRR, createReq)
 	if createRR.Code != http.StatusOK {

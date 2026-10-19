@@ -17,6 +17,15 @@ var (
 	ErrAlreadyRegistered = errors.New("студент уже записан на эту тренировку")
 )
 
+type SessionService interface {
+	IssueSession(userID int64) (accessToken, refreshToken string, err error)
+	// ResolveUserID checks access JWT first; if expired/invalid, rotates refresh.
+	// When rotated is true, newAccess and newRefresh must be set as cookies.
+	ResolveUserID(accessToken, refreshToken string) (userID int64, newAccess, newRefresh string, rotated bool, err error)
+	RevokeRefresh(rawRefresh string) error
+	RevokeAllForUser(userID int64) error
+}
+
 type UserService interface {
 	RegisterOrUpdate(telegramID int64, firstName, lastName, username string, role string) (*models.User, error)
 	CreateWebUser(username, password, firstName, lastName, role string) (*models.User, error)

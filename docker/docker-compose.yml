@@ -18,6 +18,7 @@ services:
       BASE_URL: ${BASE_URL}
       HTTP_PORT: 8080
       INVITE_SECRET: ${INVITE_SECRET:-}
+      JWT_SECRET: ${JWT_SECRET:-}
     restart: unless-stopped
     networks:
       - postgres-db_postgres-net

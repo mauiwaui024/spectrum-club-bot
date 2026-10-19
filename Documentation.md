@@ -88,14 +88,15 @@ SPA routes (coach): `/students`, `/analytics`, `/schedule-manage`, …
 | `ENVIRONMENT` | production / иначе |
 | `HTTP_PORT` | default 8080 |
 | `BASE_URL` | публичный origin для invite URL |
-| `INVITE_SECRET` | HMAC invite |
+| `INVITE_SECRET` | HMAC invite / password-link tokens |
+| `JWT_SECRET` | HMAC access JWT (required in production) |
 | `DB_*` | Postgres |
 
 ---
 
 ## 5. Узкие места
 
-1. In-memory sessions и used-invite jti
+1. Used-invite JTI still in-memory (access/refresh auth is DB-backed)
 2. `username` не UNIQUE в Postgres
 3. Нет колонки типа абонемента
 4. Тесты без Postgres

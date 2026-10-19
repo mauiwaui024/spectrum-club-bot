@@ -1,54 +1,87 @@
 package web
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"os"
 	"strings"
-	"time"
 )
 
-const sessionCookieName = "spectrum_web_session"
+const (
+	accessCookieName  = "spectrum_access"
+	refreshCookieName = "spectrum_refresh"
+	legacySessionName = "spectrum_web_session"
+	accessMaxAge      = 15 * 60
+	refreshMaxAge     = 30 * 24 * 60 * 60
+)
 
-func (h *Handler) createSession(userID int64) (string, error) {
-	tokenBytes := make([]byte, 32)
-	if _, err := rand.Read(tokenBytes); err != nil {
-		return "", err
-	}
-	token := hex.EncodeToString(tokenBytes)
-
-	h.sessionsMu.Lock()
-	h.sessions[token] = browserSession{
-		UserID:    userID,
-		ExpiresAt: time.Now().Add(24 * time.Hour),
-	}
-	h.sessionsMu.Unlock()
-
-	return token, nil
+func (h *Handler) cookieSecure() bool {
+	return strings.ToLower(os.Getenv("ENVIRONMENT")) == "production"
 }
 
-func (h *Handler) getUserIDFromSession(r *http.Request) (int64, bool) {
-	cookie, err := r.Cookie(sessionCookieName)
-	if err != nil || cookie.Value == "" {
-		return 0, false
+func (h *Handler) issueAuthCookies(w http.ResponseWriter, userID int64) error {
+	if h.sessionService == nil {
+		return errNoSessionService
 	}
+	access, refresh, err := h.sessionService.IssueSession(userID)
+	if err != nil {
+		return err
+	}
+	h.writeAuthCookies(w, access, refresh)
+	return nil
+}
 
-	h.sessionsMu.RLock()
-	session, ok := h.sessions[cookie.Value]
-	h.sessionsMu.RUnlock()
-	if !ok {
-		return 0, false
-	}
-	if session.ExpiresAt.Before(time.Now()) {
-		h.sessionsMu.Lock()
-		delete(h.sessions, cookie.Value)
-		h.sessionsMu.Unlock()
-		return 0, false
-	}
+func (h *Handler) writeAuthCookies(w http.ResponseWriter, access, refresh string) {
+	secure := h.cookieSecure()
+	http.SetCookie(w, &http.Cookie{
+		Name:     accessCookieName,
+		Value:    access,
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   secure,
+		MaxAge:   accessMaxAge,
+	})
+	http.SetCookie(w, &http.Cookie{
+		Name:     refreshCookieName,
+		Value:    refresh,
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   secure,
+		MaxAge:   refreshMaxAge,
+	})
+	// Drop legacy in-memory session cookie if present.
+	http.SetCookie(w, &http.Cookie{
+		Name:     legacySessionName,
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		MaxAge:   -1,
+	})
+}
 
-	return session.UserID, true
+func (h *Handler) clearAuthCookies(w http.ResponseWriter) {
+	secure := h.cookieSecure()
+	for _, name := range []string{accessCookieName, refreshCookieName, legacySessionName} {
+		http.SetCookie(w, &http.Cookie{
+			Name:     name,
+			Value:    "",
+			Path:     "/",
+			HttpOnly: true,
+			SameSite: http.SameSiteLaxMode,
+			Secure:   secure,
+			MaxAge:   -1,
+		})
+	}
+}
+
+func cookieValue(r *http.Request, name string) string {
+	c, err := r.Cookie(name)
+	if err != nil || c == nil {
+		return ""
+	}
+	return c.Value
 }
 
 func (h *Handler) BrowserLoginAPI(w http.ResponseWriter, r *http.Request) {
@@ -81,21 +114,10 @@ func (h *Handler) BrowserLoginAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sessionToken, err := h.createSession(user.ID)
-	if err != nil {
+	if err := h.issueAuthCookies(w, user.ID); err != nil {
 		http.Error(w, "Failed to create session", http.StatusInternalServerError)
 		return
 	}
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     sessionCookieName,
-		Value:    sessionToken,
-		Path:     "/",
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-		Secure:   strings.ToLower(os.Getenv("ENVIRONMENT")) == "production",
-		MaxAge:   60 * 60 * 24,
-	})
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -111,7 +133,7 @@ func (h *Handler) BrowserSetPasswordAPI(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	userID, err := h.getUserIDFromRequest(r)
+	userID, err := h.getUserIDFromRequest(w, r)
 	if err != nil {
 		http.Error(w, "Authentication required", http.StatusUnauthorized)
 		return
@@ -138,26 +160,17 @@ func (h *Handler) BrowserLogoutAPI(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	if cookie, err := r.Cookie(sessionCookieName); err == nil && cookie.Value != "" {
-		h.sessionsMu.Lock()
-		delete(h.sessions, cookie.Value)
-		h.sessionsMu.Unlock()
+	if h.sessionService != nil {
+		_ = h.sessionService.RevokeRefresh(cookieValue(r, refreshCookieName))
 	}
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     sessionCookieName,
-		Value:    "",
-		Path:     "/",
-		HttpOnly: true,
-		MaxAge:   -1,
-	})
+	h.clearAuthCookies(w)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{"ok": true})
 }
 
 func (h *Handler) AuthStatusAPI(w http.ResponseWriter, r *http.Request) {
-	userID, err := h.getUserIDFromRequest(r)
+	userID, err := h.getUserIDFromRequest(w, r)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{

@@ -2,6 +2,8 @@ package web
 
 import (
 	"errors"
+	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -339,11 +341,67 @@ func (m *mockAttendanceService) CreateAttendance(models.Attendance) error { retu
 func (m *mockAttendanceService) CancelAttendance(int, int) error          { return nil }
 func (m *mockAttendanceService) UnmarkAttendance(int, int) error          { return nil }
 
+type mockSessionService struct {
+	access  map[string]int64
+	refresh map[string]int64
+	seq     int
+}
+
+func newMockSessionService() *mockSessionService {
+	return &mockSessionService{
+		access:  map[string]int64{},
+		refresh: map[string]int64{},
+	}
+}
+
+func (m *mockSessionService) IssueSession(userID int64) (string, string, error) {
+	m.seq++
+	a := fmt.Sprintf("access-%d-%d", userID, m.seq)
+	r := fmt.Sprintf("refresh-%d-%d", userID, m.seq)
+	m.access[a] = userID
+	m.refresh[r] = userID
+	return a, r, nil
+}
+
+func (m *mockSessionService) ResolveUserID(accessToken, refreshToken string) (int64, string, string, bool, error) {
+	if userID, ok := m.access[accessToken]; ok {
+		return userID, "", "", false, nil
+	}
+	if userID, ok := m.refresh[refreshToken]; ok {
+		delete(m.refresh, refreshToken)
+		na, nr, err := m.IssueSession(userID)
+		if err != nil {
+			return 0, "", "", false, err
+		}
+		return userID, na, nr, true, nil
+	}
+	return 0, "", "", false, errors.New("user not authenticated")
+}
+
+func (m *mockSessionService) RevokeRefresh(rawRefresh string) error {
+	delete(m.refresh, rawRefresh)
+	return nil
+}
+
+func (m *mockSessionService) RevokeAllForUser(userID int64) error {
+	for k, v := range m.access {
+		if v == userID {
+			delete(m.access, k)
+		}
+	}
+	for k, v := range m.refresh {
+		if v == userID {
+			delete(m.refresh, k)
+		}
+	}
+	return nil
+}
+
 func testHandler(coachUserID int64) (*Handler, *mockUserService, *mockSubscriptionService, *mockScheduleService) {
 	users := &mockUserService{
 		usersByID: map[int64]*models.User{
-			coachUserID: {ID: coachUserID, Role: "coach", Username: "coach1", FirstName: "Иван", LastName: "Петров"},
-			2:           {ID: 2, Role: "student", Username: "stu1", FirstName: "Анна", LastName: "Яковлева"},
+			coachUserID: {ID: coachUserID, Role: "coach", Username: "coach1", FirstName: "Иван", LastName: "Петров", IsActive: true},
+			2:           {ID: 2, Role: "student", Username: "stu1", FirstName: "Анна", LastName: "Яковлева", IsActive: true},
 		},
 	}
 	students := &mockStudentService{
@@ -359,6 +417,7 @@ func testHandler(coachUserID int64) (*Handler, *mockUserService, *mockSubscripti
 	subs := &mockSubscriptionService{}
 	sched := &mockScheduleService{fromTpl: 3}
 	groups := &mockGroupService{groups: []models.TrainingGroup{{ID: 1, Name: "НП"}}}
+	sessions := newMockSessionService()
 
 	h := &Handler{
 		userService:         users,
@@ -368,16 +427,23 @@ func testHandler(coachUserID int64) (*Handler, *mockUserService, *mockSubscripti
 		scheduleService:     sched,
 		groupService:        groups,
 		attendanceService:   &mockAttendanceService{},
+		sessionService:      sessions,
 		inviteSecret:        "test-invite-secret",
 		baseURL:             "https://example.test",
-		sessions:            map[string]browserSession{},
 		usedInviteJTIs:      map[string]time.Time{},
 	}
 	return h, users, subs, sched
 }
 
-func withCoachSession(h *Handler, coachUserID int64) string {
-	token := "coach-session"
-	h.sessions[token] = browserSession{UserID: coachUserID, ExpiresAt: time.Now().Add(time.Hour)}
-	return token
+func withCoachSession(h *Handler, coachUserID int64) (access, refresh string) {
+	access, refresh, err := h.sessionService.IssueSession(coachUserID)
+	if err != nil {
+		panic(err)
+	}
+	return access, refresh
+}
+
+func addAuthCookies(req *http.Request, access, refresh string) {
+	req.AddCookie(&http.Cookie{Name: accessCookieName, Value: access})
+	req.AddCookie(&http.Cookie{Name: refreshCookieName, Value: refresh})
 }

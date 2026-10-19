@@ -52,6 +52,9 @@ func (h *Handler) UserByIDAPI(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		if !*req.IsActive && h.sessionService != nil {
+			_ = h.sessionService.RevokeAllForUser(userID)
+		}
 	}
 
 	if req.Role != nil {

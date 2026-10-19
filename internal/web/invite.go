@@ -139,7 +139,7 @@ func (h *Handler) RegisterInviteAPI(w http.ResponseWriter, r *http.Request) {
 
 	h.markInviteUsed(payload.JTI, time.Unix(payload.Exp, 0))
 
-	if err := h.setSessionCookie(w, user.ID); err != nil {
+	if err := h.issueAuthCookies(w, user.ID); err != nil {
 		http.Error(w, "Failed to create session", http.StatusInternalServerError)
 		return
 	}

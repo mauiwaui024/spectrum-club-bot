@@ -2,6 +2,7 @@ package web
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -16,6 +17,8 @@ import (
 	"spectrum-club-bot/internal/service"
 )
 
+var errNoSessionService = errors.New("session service not configured")
+
 type Handler struct {
 	scheduleService     service.TrainingScheduleService
 	coachService        service.CoachService
@@ -25,18 +28,12 @@ type Handler struct {
 	subscriptionService service.SubscriptionService
 	groupService        service.TrainingGroupService
 	planService         service.PlanService
+	sessionService      service.SessionService
 	inviteSecret        string
 	baseURL             string
 	allowLegacyUserID   bool
-	sessions            map[string]browserSession
-	sessionsMu          sync.RWMutex
 	usedInviteJTIs      map[string]time.Time
 	usedInviteMu        sync.Mutex
-}
-
-type browserSession struct {
-	UserID    int64
-	ExpiresAt time.Time
 }
 
 func NewHandler(
@@ -47,12 +44,14 @@ func NewHandler(
 	userService service.UserService,
 	subscriptionService service.SubscriptionService,
 	groupService service.TrainingGroupService,
+	sessionService service.SessionService,
 	baseURL string,
 ) *Handler {
 	inviteSecret := os.Getenv("INVITE_SECRET")
 	if inviteSecret == "" {
 		inviteSecret = "spectrum-invite-dev-secret"
 	}
+	env := strings.ToLower(os.Getenv("ENVIRONMENT"))
 	return &Handler{
 		scheduleService:     scheduleService,
 		coachService:        coachService,
@@ -61,10 +60,10 @@ func NewHandler(
 		userService:         userService,
 		subscriptionService: subscriptionService,
 		groupService:        groupService,
+		sessionService:      sessionService,
 		inviteSecret:        inviteSecret,
 		baseURL:             strings.TrimRight(baseURL, "/"),
-		allowLegacyUserID:   strings.ToLower(os.Getenv("ALLOW_LEGACY_USER_ID_FALLBACK")) == "true" || strings.ToLower(os.Getenv("ENVIRONMENT")) != "production",
-		sessions:            make(map[string]browserSession),
+		allowLegacyUserID:   strings.ToLower(os.Getenv("ALLOW_LEGACY_USER_ID_FALLBACK")) == "true" || env != "production",
 		usedInviteJTIs:      make(map[string]time.Time),
 	}
 }
@@ -72,7 +71,7 @@ func NewHandler(
 // CalendarAPI возвращает данные календаря в формате JSON
 func (h *Handler) CalendarAPI(w http.ResponseWriter, r *http.Request) {
 	// Получаем userID из initData или query параметра (fallback)
-	userID, userErr := h.getUserIDFromRequest(r)
+	userID, userErr := h.getUserIDFromRequest(w, r)
 	var userIDStr string
 	if userErr == nil {
 		userIDStr = strconv.FormatInt(userID, 10)
@@ -686,7 +685,7 @@ func (h *Handler) TrainingDetailsAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Получаем userID из initData или query параметра (fallback)
-	userID, err := h.getUserIDFromRequest(r)
+	userID, err := h.getUserIDFromRequest(w, r)
 	var userIDStr string
 	var isCoach bool
 	var isTrainingCoach bool
@@ -830,7 +829,7 @@ func (h *Handler) RegisterForTraining(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Получаем userID через unified auth (initData или browser session)
-	userID, authErr := h.getUserIDFromRequest(r)
+	userID, authErr := h.getUserIDFromRequest(w, r)
 	if authErr != nil {
 		log.Printf("[RegisterForTraining] auth failed: %v", authErr)
 		http.Error(w, "Authentication required", http.StatusUnauthorized)
@@ -932,7 +931,7 @@ func (h *Handler) CancelRegistration(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Получаем userID через unified auth (initData или browser session)
-	userID, authErr := h.getUserIDFromRequest(r)
+	userID, authErr := h.getUserIDFromRequest(w, r)
 	if authErr != nil {
 		http.Error(w, "Authentication required", http.StatusUnauthorized)
 		return
@@ -1010,7 +1009,7 @@ func (h *Handler) MarkAttendanceAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Получаем userID из initData (безопасный способ) или из query параметра (fallback)
-	userID, authErr := h.getUserIDFromRequest(r)
+	userID, authErr := h.getUserIDFromRequest(w, r)
 	if authErr != nil {
 		http.Error(w, "Authentication required", http.StatusUnauthorized)
 		return
@@ -1166,7 +1165,7 @@ func (h *Handler) CheckRegistration(w http.ResponseWriter, r *http.Request) {
 	trainingID, _ := strconv.Atoi(trainingIDStr)
 
 	// Получаем userID через unified auth (initData или browser session)
-	userID, err := h.getUserIDFromRequest(r)
+	userID, err := h.getUserIDFromRequest(w, r)
 	if err != nil {
 		http.Error(w, "Authentication required", http.StatusUnauthorized)
 		return
@@ -1191,10 +1190,18 @@ func (h *Handler) CheckRegistration(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// getUserIDFromRequest извлекает userID через browser session cookie (или legacy user_id).
-func (h *Handler) getUserIDFromRequest(r *http.Request) (int64, error) {
-	if userID, ok := h.getUserIDFromSession(r); ok {
-		return userID, nil
+// getUserIDFromRequest extracts userID from access JWT cookie, silent-refreshes via refresh cookie, or legacy user_id.
+func (h *Handler) getUserIDFromRequest(w http.ResponseWriter, r *http.Request) (int64, error) {
+	if h.sessionService != nil {
+		access := cookieValue(r, accessCookieName)
+		refresh := cookieValue(r, refreshCookieName)
+		userID, newAccess, newRefresh, rotated, err := h.sessionService.ResolveUserID(access, refresh)
+		if err == nil {
+			if rotated && w != nil {
+				h.writeAuthCookies(w, newAccess, newRefresh)
+			}
+			return userID, nil
+		}
 	}
 
 	if h.allowLegacyUserID {
@@ -1218,7 +1225,7 @@ func (h *Handler) MyRegistrationsAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Получаем userID через unified auth (initData или browser session)
-	userID, err := h.getUserIDFromRequest(r)
+	userID, err := h.getUserIDFromRequest(w, r)
 	if err != nil {
 		http.Error(w, "Authentication required", http.StatusUnauthorized)
 		return
@@ -1314,7 +1321,7 @@ func (h *Handler) MySubscriptionAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Получаем userID через unified auth (initData или browser session)
-	userID, err := h.getUserIDFromRequest(r)
+	userID, err := h.getUserIDFromRequest(w, r)
 	if err != nil {
 		http.Error(w, "Authentication required", http.StatusUnauthorized)
 		return
@@ -1391,7 +1398,7 @@ func (h *Handler) MyProfileAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Получаем userID через unified auth (initData или browser session)
-	userID, err := h.getUserIDFromRequest(r)
+	userID, err := h.getUserIDFromRequest(w, r)
 	if err != nil {
 		http.Error(w, "Authentication required", http.StatusUnauthorized)
 		return
@@ -1458,7 +1465,7 @@ func (h *Handler) UpdateProfileAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Получаем userID через unified auth (initData или browser session)
-	userID, err := h.getUserIDFromRequest(r)
+	userID, err := h.getUserIDFromRequest(w, r)
 	if err != nil {
 		http.Error(w, "Authentication required", http.StatusUnauthorized)
 		return
@@ -1604,7 +1611,7 @@ func (h *Handler) AllStudentsSubscriptionsAPI(w http.ResponseWriter, r *http.Req
 	}
 
 	// Получаем userID через unified auth (initData или browser session)
-	userID, err := h.getUserIDFromRequest(r)
+	userID, err := h.getUserIDFromRequest(w, r)
 	if err != nil {
 		http.Error(w, "Authentication required", http.StatusUnauthorized)
 		return
@@ -1727,7 +1734,7 @@ func (h *Handler) AddLessonsAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Получаем userID и проверяем, что это тренер
-	userID, err := h.getUserIDFromRequest(r)
+	userID, err := h.getUserIDFromRequest(w, r)
 	if err != nil {
 		h.sendJSONError(w, http.StatusUnauthorized, "Authentication required")
 		return
@@ -1815,7 +1822,7 @@ func (h *Handler) RemoveLessonsAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Получаем userID и проверяем, что это тренер
-	userID, err := h.getUserIDFromRequest(r)
+	userID, err := h.getUserIDFromRequest(w, r)
 	if err != nil {
 		h.sendJSONError(w, http.StatusUnauthorized, "Authentication required")
 		return
@@ -1902,7 +1909,7 @@ func (h *Handler) SetSubscriptionEndDateAPI(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	userID, err := h.getUserIDFromRequest(r)
+	userID, err := h.getUserIDFromRequest(w, r)
 	if err != nil {
 		h.sendJSONError(w, http.StatusUnauthorized, "Authentication required")
 		return

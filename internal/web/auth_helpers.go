@@ -3,7 +3,6 @@ package web
 import (
 	"encoding/json"
 	"net/http"
-	"os"
 	"strings"
 
 	"spectrum-club-bot/internal/models"
@@ -37,7 +36,7 @@ func (h *Handler) writeJSON(w http.ResponseWriter, status int, payload interface
 }
 
 func (h *Handler) requireUser(w http.ResponseWriter, r *http.Request) (*models.User, bool) {
-	userID, err := h.getUserIDFromRequest(r)
+	userID, err := h.getUserIDFromRequest(w, r)
 	if err != nil {
 		http.Error(w, "Authentication required", http.StatusUnauthorized)
 		return nil, false
@@ -60,21 +59,4 @@ func (h *Handler) requireCoach(w http.ResponseWriter, r *http.Request) (*models.
 		return nil, false
 	}
 	return user, true
-}
-
-func (h *Handler) setSessionCookie(w http.ResponseWriter, userID int64) error {
-	sessionToken, err := h.createSession(userID)
-	if err != nil {
-		return err
-	}
-	http.SetCookie(w, &http.Cookie{
-		Name:     sessionCookieName,
-		Value:    sessionToken,
-		Path:     "/",
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-		Secure:   strings.ToLower(os.Getenv("ENVIRONMENT")) == "production",
-		MaxAge:   60 * 60 * 24,
-	})
-	return nil
 }

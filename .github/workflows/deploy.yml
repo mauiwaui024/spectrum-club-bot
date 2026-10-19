@@ -57,6 +57,7 @@ jobs:
         ENVIRONMENT=${{ secrets.ENVIRONMENT }}
         BASE_URL=${{ secrets.BASE_URL }}
         INVITE_SECRET=${{ secrets.INVITE_SECRET }}
+        JWT_SECRET=${{ secrets.JWT_SECRET }}
         IMAGE_TAG=${{ github.sha }}
         EOF
         

@@ -5,6 +5,14 @@ import (
 	"time"
 )
 
+type RefreshTokenRepository interface {
+	Create(userID int64, tokenHash []byte, expiresAt time.Time) error
+	GetByHash(tokenHash []byte) (*models.RefreshToken, error)
+	DeleteByHash(tokenHash []byte) error
+	DeleteAllForUser(userID int64) error
+	DeleteExpired(before time.Time) error
+}
+
 type UserRepository interface {
 	CreateOrUpdate(user *models.User) error
 	CreateWithPassword(user *models.User, passwordHash string) error
