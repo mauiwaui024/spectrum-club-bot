@@ -13,13 +13,26 @@ type attendanceService struct {
 	attendanceRepo      repository.AttendanceRepository
 	scheduleRepo        repository.TrainingScheduleRepository
 	subscriptionService service.SubscriptionService
+	coachService        service.CoachService
+	studentService      service.StudentService
+	userService         service.UserService
 }
 
-func NewAttendanceService(attendanceRepo repository.AttendanceRepository, scheduleRepo repository.TrainingScheduleRepository, subscriptionService service.SubscriptionService) service.AttendanceService {
+func NewAttendanceService(
+	attendanceRepo repository.AttendanceRepository,
+	scheduleRepo repository.TrainingScheduleRepository,
+	subscriptionService service.SubscriptionService,
+	coachService service.CoachService,
+	studentService service.StudentService,
+	userService service.UserService,
+) service.AttendanceService {
 	return &attendanceService{
 		attendanceRepo:      attendanceRepo,
 		scheduleRepo:        scheduleRepo,
 		subscriptionService: subscriptionService,
+		coachService:        coachService,
+		studentService:      studentService,
+		userService:         userService,
 	}
 }
 
@@ -52,6 +65,49 @@ func (s *attendanceService) SignUpForTraining(studentID, trainingID int) error {
 	}
 
 	return s.attendanceRepo.CreateAttendance(attendance)
+}
+
+func (s *attendanceService) SignUpStudentByCoach(coachUserID, studentID int64, trainingID int) error {
+	coach, err := s.coachService.GetCoachByUserID(coachUserID)
+	if err != nil || coach == nil {
+		return service.ErrNotTrainingCoach
+	}
+	training, err := s.scheduleRepo.GetTrainingByID(trainingID)
+	if err != nil {
+		return err
+	}
+	if training == nil {
+		return service.ErrTrainingNotFound
+	}
+	if training.CoachID == nil || *training.CoachID != coach.ID {
+		return service.ErrNotTrainingCoach
+	}
+	student, err := s.studentService.GetStudentByID(studentID)
+	if err != nil || student == nil {
+		return service.ErrStudentNotFound
+	}
+	user, err := s.userService.GetByID(student.UserID)
+	if err != nil || user == nil {
+		return service.ErrStudentNotFound
+	}
+	if user.Role != "student" {
+		return service.ErrNotAStudent
+	}
+	if !user.IsActive {
+		return service.ErrInactiveStudent
+	}
+	sub, err := s.subscriptionService.GetActiveSubscription(student.ID)
+	if err != nil || sub == nil {
+		return service.ErrNoSubscription
+	}
+	existing, err := s.attendanceRepo.GetStudentAttendanceForTraining(int(student.ID), trainingID)
+	if err != nil {
+		return err
+	}
+	if existing != nil {
+		return service.ErrAlreadyRegistered
+	}
+	return s.SignUpForTraining(int(student.ID), trainingID)
 }
 
 // Отмена записи

@@ -1,8 +1,20 @@
 package service
 
 import (
+	"errors"
+
 	"spectrum-club-bot/internal/models"
 	"time"
+)
+
+var (
+	ErrNotTrainingCoach  = errors.New("только тренер этой тренировки может записать ученика")
+	ErrTrainingNotFound  = errors.New("тренировка не найдена")
+	ErrStudentNotFound   = errors.New("ученик не найден")
+	ErrNotAStudent       = errors.New("записать можно только ученика")
+	ErrInactiveStudent   = errors.New("вход для этого ученика закрыт")
+	ErrNoSubscription    = errors.New("Пополните абонемент. Для записи на тренировку необходим активный абонемент с оставшимися занятиями.")
+	ErrAlreadyRegistered = errors.New("студент уже записан на эту тренировку")
 )
 
 type UserService interface {
@@ -133,6 +145,8 @@ type WeekScheduleService interface {
 type AttendanceService interface {
 	// Запись на тренировку
 	SignUpForTraining(studentID, trainingID int) error
+	// Тренер записывает ученика на свою тренировку. Правило двух часов не применяется.
+	SignUpStudentByCoach(coachUserID, studentID int64, trainingID int) error
 	// Отмена записи
 	CancelSignUp(studentID, trainingID int) error
 	// Для тренеров - отметка посещения

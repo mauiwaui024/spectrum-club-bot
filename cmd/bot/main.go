@@ -60,7 +60,7 @@ func main() {
 	coachService := coach_service.NewCoachService(coachRepo)
 	subscriptionService := subscription_service.NewSubscriptionService(subscriptionRepo)
 	trainingGroupService := group_serivce.NewTrainingGroupService(trainingGroupRepo)
-	attendanceService := attendance_service.NewAttendanceService(attendanceRepo, scheduleRepo, subscriptionService)
+	attendanceService := attendance_service.NewAttendanceService(attendanceRepo, scheduleRepo, subscriptionService, coachService, studentService, userService)
 	scheduleService := schedule_service.NewScheduleService(scheduleRepo, attendanceRepo, templateScheduleRepos, trainingGroupRepo)
 
 	calendarHandler := web.NewHandler(
@@ -111,6 +111,7 @@ func main() {
 	mux.HandleFunc("/api/groups/", calendarHandler.GroupByIDAPI)
 	mux.HandleFunc("/api/coach/schedule", calendarHandler.CoachScheduleAPI)
 	mux.HandleFunc("/api/trainings", calendarHandler.TrainingsAPI)
+	mux.HandleFunc("/api/trainings/register-student", calendarHandler.RegisterStudentByCoachAPI)
 	mux.HandleFunc("/api/trainings/", calendarHandler.TrainingByIDAPI)
 	mux.HandleFunc("/api/templates", calendarHandler.TemplatesAPI)
 	mux.HandleFunc("/api/templates/", calendarHandler.TemplateByIDAPI)

@@ -162,6 +162,26 @@
          </div>
           </div>
           
+          <div *ngIf="selectedTraining.is_training_coach" style="margin-top: 16px;">
+            <button type="button" class="modal-btn modal-btn-secondary" (click)="toggleCoachSignup()">
+              Записать ученика
+            </button>
+            <div *ngIf="coachSignupOpen" style="margin-top: 10px;">
+              <input [(ngModel)]="coachSignupQuery" placeholder="Имя" style="width: 100%; padding: 8px; margin-bottom: 8px;" />
+              <p *ngIf="coachSignupError" style="color: #b91c1c;">{{ coachSignupError }}</p>
+              <p *ngIf="!filteredSignupStudents().length" style="color: #5f6368;">Некого записать</p>
+              <button
+                type="button"
+                class="modal-btn modal-btn-primary"
+                style="display: block; width: 100%; margin-bottom: 6px; text-align: left;"
+                *ngFor="let student of filteredSignupStudents()"
+                [disabled]="coachSignupLoading"
+                (click)="signUpStudent(student)">
+                {{ student.display_name }}
+              </button>
+            </div>
+          </div>
+
           <div class="modal-actions" style="margin-top: 20px;">
             <button 
               *ngIf="selectedTraining.is_registered"
@@ -202,7 +222,7 @@
             <div *ngIf="!selectedTraining.can_register && !selectedTraining.is_registered && !selectedTraining.can_mark_attendance">
               <button class="modal-btn modal-btn-secondary" (click)="closeModal()">Закрыть</button>
               <span style="color: #5f6368; padding: 10px;">
-                <span *ngIf="selectedTraining.is_coach">Только ученики могут записываться на тренировки.</span>
+                <span *ngIf="selectedTraining.is_coach && !selectedTraining.is_training_coach">Только ученики могут записываться на тренировки.</span>
                 <span *ngIf="!selectedTraining.is_coach">
                   Невозможно записаться
                   <span *ngIf="selectedTraining.is_past"> (Тренировка прошла)</span>

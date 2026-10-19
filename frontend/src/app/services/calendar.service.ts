@@ -32,6 +32,13 @@ export class CalendarService {
     return this.http.get<TrainingDetails>(`${this.apiUrl}/training/${trainingId}`, this.getRequestOptions());
   }
 
+  registerStudentByCoach(trainingId: number, studentId: number): Observable<any> {
+    return this.http.post(`${this.apiUrl}/trainings/register-student`, {
+      training_id: trainingId,
+      student_id: studentId
+    }, this.getRequestOptions());
+  }
+
   registerForTraining(trainingId: number): Observable<any> {
     const formData = new FormData();
     formData.append('training_id', trainingId.toString());

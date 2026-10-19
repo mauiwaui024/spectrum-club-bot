@@ -1,6 +1,8 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
+import { httpErrorMessage } from '../utils/http-error';
 import { CalendarService } from '../services/calendar.service';
 import { CalendarAPIResponse, CalendarDay, TrainingDetails } from '../models/training.model';
 import { CalendarEvent, CalendarView, CalendarCommonModule, CalendarMonthModule, CalendarWeekModule, CalendarDayModule } from 'angular-calendar';
@@ -10,7 +12,8 @@ import { adapterFactory } from 'angular-calendar/date-adapters/date-fns';
   selector: 'app-calendar',
   standalone: true,
   imports: [
-    CommonModule, 
+    CommonModule,
+    FormsModule,
     RouterModule,
     CalendarCommonModule,
     CalendarMonthModule,
@@ -40,6 +43,11 @@ export class CalendarComponent implements OnInit {
   // Attendance marking state (для тренеров)
   selectedStudents: Set<number> = new Set();
   isSelectingAttendance: boolean = false;
+  coachSignupOpen = false;
+  coachSignupQuery = '';
+  coachSignupLoading = false;
+  coachSignupError: string | null = null;
+  signupStudents: { student_id: number; display_name: string; is_active: boolean }[] = [];
 
   readonly CalendarView = CalendarView;
 
@@ -391,6 +399,51 @@ export class CalendarComponent implements OnInit {
     this.selectedTraining = null;
     this.isSelectingAttendance = false;
     this.selectedStudents.clear();
+    this.coachSignupOpen = false;
+    this.coachSignupQuery = '';
+    this.coachSignupError = null;
+  }
+
+  toggleCoachSignup(): void {
+    this.coachSignupOpen = !this.coachSignupOpen;
+    this.coachSignupError = null;
+    if (!this.coachSignupOpen || this.signupStudents.length) {
+      return;
+    }
+    this.calendarService.getStudents().subscribe({
+      next: (res) => { this.signupStudents = res.students || []; },
+      error: (err) => { this.coachSignupError = httpErrorMessage(err, 'Не удалось загрузить учеников'); }
+    });
+  }
+
+  filteredSignupStudents(): { student_id: number; display_name: string }[] {
+    const taken = new Set((this.selectedTraining?.participants || []).map(p => p.student_id));
+    const q = this.coachSignupQuery.trim().toLowerCase();
+    return this.signupStudents.filter(s => {
+      if (!s.is_active || !s.student_id || taken.has(s.student_id)) {
+        return false;
+      }
+      return !q || (s.display_name || '').toLowerCase().includes(q);
+    });
+  }
+
+  signUpStudent(student: { student_id: number }): void {
+    const trainingId = this.selectedTraining?.training?.id;
+    if (!trainingId) {
+      return;
+    }
+    this.coachSignupLoading = true;
+    this.coachSignupError = null;
+    this.calendarService.registerStudentByCoach(trainingId, student.student_id).subscribe({
+      next: () => {
+        this.coachSignupLoading = false;
+        this.showEventDetails(trainingId);
+      },
+      error: (err) => {
+        this.coachSignupLoading = false;
+        this.coachSignupError = httpErrorMessage(err, 'Не удалось записать ученика');
+      }
+    });
   }
   
   // Переключение режима выбора посещаемости

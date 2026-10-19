@@ -305,10 +305,15 @@ func (m *mockScheduleService) DeactivateTemplate(int) error                     
 func (m *mockScheduleService) ActivateTemplate(int) error                        { return nil }
 func (m *mockScheduleService) GetTemplatesForPreview() (string, error)           { return "", nil }
 
-type mockAttendanceService struct{}
+type mockAttendanceService struct {
+	coachSignupErr error
+}
 
 func (m *mockAttendanceService) SignUpForTraining(int, int) error { return nil }
-func (m *mockAttendanceService) CancelSignUp(int, int) error      { return nil }
+func (m *mockAttendanceService) SignUpStudentByCoach(int64, int64, int) error {
+	return m.coachSignupErr
+}
+func (m *mockAttendanceService) CancelSignUp(int, int) error { return nil }
 func (m *mockAttendanceService) MarkAttendance(int, int, int, bool, string) error {
 	return nil
 }
