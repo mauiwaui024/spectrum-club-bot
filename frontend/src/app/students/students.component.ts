@@ -22,7 +22,7 @@ interface StudentRow {
   template: `
     <div class="page">
       <h1>Ученики</h1>
-      <p class="hint">Нажмите на ученика, чтобы открыть карточку.</p>
+      <p class="hint">Нажмите на ученика, чтобы открыть карточку под ним.</p>
       <div class="filters">
         <select [(ngModel)]="filter" (change)="load()">
           <option value="all">Все</option>
@@ -37,104 +37,120 @@ interface StudentRow {
       <p *ngIf="message" class="ok">{{ message }}</p>
       <div *ngIf="loading">Загрузка...</div>
 
-      <div class="layout" *ngIf="!loading">
-        <ul class="list">
-          <li
-            *ngFor="let s of students"
-            class="row"
-            [class.selected]="selected?.user_id === s.user_id"
-            [class.inactive]="!s.is_active"
-            (click)="openStudent(s)">
-            <strong>{{ s.display_name }}</strong>
-            <span class="meta">{{ s.username || '—' }}</span>
-          </li>
-          <li *ngIf="!students.length" class="empty">Никого не найдено</li>
-        </ul>
+      <ul class="list" *ngIf="!loading">
+        <li *ngFor="let s of students" class="person" [class.inactive]="!s.is_active" [class.open]="isOpen(s)">
+          <button type="button" class="row" (click)="toggleStudent(s)">
+            <span>
+              <strong>{{ s.display_name }}</strong>
+              <span class="meta">{{ s.username || '—' }}</span>
+            </span>
+            <span class="chevron">{{ isOpen(s) ? '▼' : '▶' }}</span>
+          </button>
 
-        <aside class="detail" *ngIf="selected">
-          <header class="detail-header">
-            <h2>{{ selected.display_name }}</h2>
-            <button type="button" class="btn-ghost" (click)="closeStudent()">Закрыть</button>
-          </header>
+          <div class="detail" *ngIf="isOpen(s)">
+            <dl class="info">
+              <div><dt>Логин</dt><dd>{{ s.username || '—' }}</dd></div>
+              <div><dt>ID ученика</dt><dd>{{ s.student_id || '—' }}</dd></div>
+              <div><dt>Роль</dt><dd>{{ roleLabel(s.role) }}</dd></div>
+              <div><dt>Статус</dt><dd>{{ s.is_active ? 'активен' : 'деактивирован' }}</dd></div>
+            </dl>
 
-          <dl class="info">
-            <div><dt>Логин</dt><dd>{{ selected.username || '—' }}</dd></div>
-            <div><dt>Имя</dt><dd>{{ selected.first_name || '—' }}</dd></div>
-            <div><dt>Фамилия</dt><dd>{{ selected.last_name || '—' }}</dd></div>
-            <div><dt>ID ученика</dt><dd>{{ selected.student_id || '—' }}</dd></div>
-            <div><dt>Роль</dt><dd>{{ roleLabel(selected.role) }}</dd></div>
-            <div><dt>Статус</dt><dd>{{ selected.is_active ? 'активен' : 'деактивирован' }}</dd></div>
-          </dl>
+            <div class="name-edit">
+              <label>
+                Имя
+                <input [(ngModel)]="editFirst" name="firstName" />
+              </label>
+              <label>
+                Фамилия
+                <input [(ngModel)]="editLast" name="lastName" />
+              </label>
+              <button type="button" (click)="saveName(s)">Сохранить имя</button>
+            </div>
 
-          <div class="safe-actions">
-            <button type="button" (click)="toggleActive(selected)">
-              {{ selected.is_active ? 'Деактивировать вход' : 'Активировать вход' }}
-            </button>
+            <div class="safe-actions">
+              <button type="button" (click)="toggleActive(s)">
+                {{ s.is_active ? 'Деактивировать вход' : 'Активировать вход' }}
+              </button>
+            </div>
+
+            <details class="danger-zone" (toggle)="onDangerToggle($event)">
+              <summary>Опасная зона · доступ и роли</summary>
+              <p class="warn">
+                Смена роли меняет права во всём приложении. Ученик, ставший тренером,
+                пропадает из этого списка. Не используйте без необходимости.
+              </p>
+
+              <div *ngIf="!roleMenuOpen" class="nested">
+                <button type="button" class="btn-muted" (click)="unlockRoleMenu()">
+                  Показать смену роли…
+                </button>
+              </div>
+
+              <div *ngIf="roleMenuOpen" class="nested role-menu">
+                <p class="warn tight">Два подтверждения обязательны.</p>
+                <button type="button" class="btn-danger" (click)="promoteToCoach(s)">
+                  Сделать тренером
+                </button>
+                <button type="button" class="btn-muted" (click)="demoteToStudent(s)" *ngIf="s.role === 'coach'">
+                  Вернуть в ученики
+                </button>
+                <button type="button" class="btn-ghost" (click)="roleMenuOpen = false">Скрыть</button>
+              </div>
+            </details>
+
+            <div class="purge">
+              <p class="warn">
+                Удаление стирает человека, абонементы, записи и явку.
+                В статистике его больше не будет. Вернуть нельзя.
+              </p>
+              <button type="button" class="btn-danger" (click)="deleteStudent(s)">Удалить ученика</button>
+            </div>
           </div>
-
-          <details class="danger-zone" (toggle)="onDangerToggle($event)">
-            <summary>Опасная зона · доступ и роли</summary>
-            <p class="warn">
-              Смена роли меняет права во всём приложении. Ученик, ставший тренером,
-              пропадает из этого списка. Не используйте без необходимости.
-            </p>
-
-            <div *ngIf="!roleMenuOpen" class="nested">
-              <button type="button" class="btn-muted" (click)="unlockRoleMenu()">
-                Показать смену роли…
-              </button>
-            </div>
-
-            <div *ngIf="roleMenuOpen" class="nested role-menu">
-              <p class="warn tight">Два подтверждения обязательны.</p>
-              <button type="button" class="btn-danger" (click)="promoteToCoach(selected)">
-                Сделать тренером
-              </button>
-              <button type="button" class="btn-muted" (click)="demoteToStudent(selected)" *ngIf="selected.role === 'coach'">
-                Вернуть в ученики
-              </button>
-              <button type="button" class="btn-ghost" (click)="roleMenuOpen = false">Скрыть</button>
-            </div>
-          </details>
-        </aside>
-
-        <aside class="detail placeholder" *ngIf="!selected && students.length">
-          <p class="muted">Выберите ученика слева</p>
-        </aside>
-      </div>
+        </li>
+        <li *ngIf="!students.length" class="empty">Никого не найдено</li>
+      </ul>
     </div>
   `,
   styles: [`
-    .page { max-width: 960px; margin: 0 auto; padding: 16px; color: var(--text); }
+    .page { max-width: 720px; margin: 0 auto; padding: 16px; color: var(--text); }
     .hint, .muted { color: var(--muted); font-size: 14px; margin: 0 0 8px; }
     .filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
     .filters input, .filters select, button { padding: 8px; font-size: 14px; }
-    .layout { display: grid; grid-template-columns: 1fr; gap: 16px; }
-    @media (min-width: 720px) {
-      .layout { grid-template-columns: 1fr 1fr; align-items: start; }
-    }
     .list { list-style: none; padding: 0; margin: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--card); }
-    .row { padding: 12px 14px; border-bottom: 1px solid var(--border); cursor: pointer; }
-    .row:last-child { border-bottom: none; }
+    .person { border-bottom: 1px solid var(--border); }
+    .person:last-child { border-bottom: none; }
+    .person.inactive .row { opacity: 0.55; }
+    .person.open { background: var(--hover); }
+    .row {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      background: transparent;
+      border: none;
+      color: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
     .row:hover { background: var(--hover); }
-    .row.selected { background: var(--primary-soft); }
-    .row.inactive { opacity: 0.55; }
+    .chevron { color: var(--muted); }
     .meta { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
     .empty { padding: 16px; color: var(--muted); }
-    .detail { border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: var(--card); }
-    .detail.placeholder { display: flex; align-items: center; justify-content: center; min-height: 160px; }
-    .detail-header { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 12px; }
-    .detail-header h2 { margin: 0; font-size: 1.15rem; }
-    .info { margin: 0 0 16px; }
+    .detail { padding: 4px 14px 16px; }
+    .info { margin: 0 0 12px; }
     .info > div { display: grid; grid-template-columns: 120px 1fr; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
     .info dt { color: var(--muted); margin: 0; }
     .info dd { margin: 0; }
-    .safe-actions { margin-bottom: 16px; }
-    .danger-zone { border: 1px solid var(--danger-border); border-radius: 8px; padding: 10px 12px; background: var(--danger-bg); }
+    .name-edit, .safe-actions, .nested, .purge { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+    .name-edit label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+    .name-edit input { padding: 8px; font-size: 14px; color: var(--text); background: var(--input-bg); border: 1px solid var(--border); }
+    .danger-zone, .purge { border: 1px solid var(--danger-border); border-radius: 8px; padding: 10px 12px; background: var(--danger-bg); }
     .danger-zone summary { cursor: pointer; font-weight: 600; color: var(--danger-text); }
     .warn { color: var(--danger-text); font-size: 13px; line-height: 1.4; margin: 10px 0; }
+    .purge .warn { margin-top: 0; }
     .warn.tight { margin-top: 0; }
-    .nested { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
     .btn-ghost { background: transparent; border: 1px solid var(--border); }
     .btn-muted { background: var(--hover); border: 1px solid var(--border); }
     .btn-danger { background: var(--danger-bg); border: 1px solid var(--danger-border); color: var(--danger-text); }
@@ -144,6 +160,8 @@ interface StudentRow {
 export class StudentsComponent implements OnInit {
   students: StudentRow[] = [];
   selected: StudentRow | null = null;
+  editFirst = '';
+  editLast = '';
   filter = 'all';
   days = 14;
   q = '';
@@ -164,6 +182,10 @@ export class StudentsComponent implements OnInit {
     return role || '—';
   }
 
+  isOpen(s: StudentRow): boolean {
+    return this.selected?.user_id === s.user_id;
+  }
+
   load(): void {
     this.loading = true;
     this.error = null;
@@ -173,7 +195,12 @@ export class StudentsComponent implements OnInit {
         if (this.selected) {
           const still = this.students.find((s) => s.user_id === this.selected!.user_id);
           this.selected = still || null;
-          if (!still) this.roleMenuOpen = false;
+          if (still) {
+            this.editFirst = still.first_name || '';
+            this.editLast = still.last_name || '';
+          } else {
+            this.roleMenuOpen = false;
+          }
         }
         this.loading = false;
       },
@@ -184,16 +211,55 @@ export class StudentsComponent implements OnInit {
     });
   }
 
-  openStudent(s: StudentRow): void {
+  toggleStudent(s: StudentRow): void {
+    if (this.isOpen(s)) {
+      this.selected = null;
+      this.roleMenuOpen = false;
+      return;
+    }
     this.selected = s;
+    this.editFirst = s.first_name || '';
+    this.editLast = s.last_name || '';
     this.roleMenuOpen = false;
     this.message = null;
     this.error = null;
   }
 
-  closeStudent(): void {
-    this.selected = null;
-    this.roleMenuOpen = false;
+  saveName(s: StudentRow): void {
+    const first = this.editFirst.trim();
+    const last = this.editLast.trim();
+    if (!first || !last) {
+      this.error = 'Укажите имя и фамилию';
+      return;
+    }
+    this.message = null;
+    this.error = null;
+    this.api.patchUser(s.user_id, { first_name: first, last_name: last }).subscribe({
+      next: () => {
+        this.message = 'Имя сохранено';
+        this.load();
+      },
+      error: (err) => (this.error = httpErrorMessage(err, 'Не удалось сохранить имя'))
+    });
+  }
+
+  deleteStudent(s: StudentRow): void {
+    const ok = confirm(
+      `Удалить «${s.display_name}»?\n\n` +
+        'Пропадут абонементы, записи и явка. В статистике его больше не будет. Вернуть нельзя.'
+    );
+    if (!ok) return;
+    this.message = null;
+    this.error = null;
+    this.api.deleteUser(s.user_id).subscribe({
+      next: () => {
+        this.selected = null;
+        this.roleMenuOpen = false;
+        this.message = 'Ученик удалён';
+        this.load();
+      },
+      error: (err) => (this.error = httpErrorMessage(err, 'Не удалось удалить ученика'))
+    });
   }
 
   onDangerToggle(event: Event): void {

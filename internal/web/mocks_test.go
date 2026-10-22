@@ -42,7 +42,22 @@ func (m *mockUserService) SetRole(int64, string) error { return nil }
 func (m *mockUserService) RegisterAsCoach(int64, string, string, string) error {
 	return nil
 }
-func (m *mockUserService) UpdateProfile(int64, *string, *string) error { return nil }
+func (m *mockUserService) UpdateProfile(userID int64, firstName, lastName *string) error {
+	u, ok := m.usersByID[userID]
+	if !ok || u == nil || firstName == nil || lastName == nil {
+		return errors.New("not found")
+	}
+	u.FirstName = *firstName
+	u.LastName = *lastName
+	return nil
+}
+func (m *mockUserService) DeleteUser(userID int64) error {
+	if _, ok := m.usersByID[userID]; !ok {
+		return errors.New("not found")
+	}
+	delete(m.usersByID, userID)
+	return nil
+}
 func (m *mockUserService) GetAllStudents() ([]*models.User, error) {
 	var out []*models.User
 	for _, u := range m.usersByID {

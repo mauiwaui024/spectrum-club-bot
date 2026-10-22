@@ -28,6 +28,7 @@ type UserRepository interface {
 	RecordPDConsent(userID int64, policyVersion string, at time.Time) error
 	ListWithoutPassword() ([]*models.User, error)
 	SetUsernameIfEmpty(userID int64, username string) error
+	Delete(userID int64) error
 
 	GetAllStudents() ([]*models.User, error)
 }

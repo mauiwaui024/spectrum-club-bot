@@ -186,6 +186,7 @@ func (f *fakeUser) GetUserProfile(int64) (*models.User, *models.Student, *models
 func (f *fakeUser) SetRole(int64, string) error                         { return nil }
 func (f *fakeUser) RegisterAsCoach(int64, string, string, string) error { return nil }
 func (f *fakeUser) UpdateProfile(int64, *string, *string) error         { return nil }
+func (f *fakeUser) DeleteUser(int64) error                              { return nil }
 func (f *fakeUser) GetAllStudents() ([]*models.User, error)             { return nil, nil }
 func (f *fakeUser) GetByID(int64) (*models.User, error)                 { return f.user, nil }
 func (f *fakeUser) GetByTelegramID(int64) (*models.User, error)         { return f.user, nil }

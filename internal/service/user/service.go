@@ -233,6 +233,10 @@ func (s *userService) UpdateProfile(userID int64, firstName, lastName *string) e
 	return s.userRepo.UpdateUser(userID, firstName, lastName)
 }
 
+func (s *userService) DeleteUser(userID int64) error {
+	return s.userRepo.Delete(userID)
+}
+
 func (s *userService) SetBrowserPassword(userID int64, plainPassword string) error {
 	plainPassword = strings.TrimSpace(plainPassword)
 	if len(plainPassword) < 8 {

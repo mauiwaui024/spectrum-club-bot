@@ -55,7 +55,8 @@ func (m *memUsers) UpdateUser(int64, *string, *string) error       { return nil 
 func (m *memUsers) SetActive(int64, bool) error                    { return nil }
 func (m *memUsers) RecordPDConsent(int64, string, time.Time) error { return nil }
 func (m *memUsers) ListWithoutPassword() ([]*models.User, error)   { return nil, nil }
-func (m *memUsers) SetUsernameIfEmpty(int64, string) error         { return nil }
+func (m *memUsers) SetUsernameIfEmpty(int64, string) error { return nil }
+func (m *memUsers) Delete(int64) error                     { return nil }
 func (m *memUsers) GetAllStudents() ([]*models.User, error)        { return nil, nil }
 
 func TestIssueAndResolveAccess(t *testing.T) {

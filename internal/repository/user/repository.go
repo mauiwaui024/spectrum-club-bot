@@ -177,6 +177,21 @@ func (r *userRepository) GetAllStudents() ([]*models.User, error) {
 	return users, nil
 }
 
+func (r *userRepository) Delete(userID int64) error {
+	res, err := r.db.Exec(`DELETE FROM spectrum.users WHERE id = $1`, userID)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
 func (r *userRepository) SetActive(userID int64, active bool) error {
 	_, err := r.db.Exec(`
 		UPDATE spectrum.users SET is_active = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2

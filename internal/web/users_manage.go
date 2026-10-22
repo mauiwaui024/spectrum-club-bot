@@ -8,7 +8,7 @@ import (
 )
 
 func (h *Handler) UserByIDAPI(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPatch {
+	if r.Method != http.MethodPatch && r.Method != http.MethodDelete {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -24,16 +24,23 @@ func (h *Handler) UserByIDAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if r.Method == http.MethodDelete {
+		h.deleteStudentUser(w, actor.ID, userID)
+		return
+	}
+
 	var req struct {
-		Role     *string `json:"role"`
-		IsActive *bool   `json:"is_active"`
+		Role      *string `json:"role"`
+		IsActive  *bool   `json:"is_active"`
+		FirstName *string `json:"first_name"`
+		LastName  *string `json:"last_name"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
-	if req.Role == nil && req.IsActive == nil {
-		http.Error(w, "role or is_active required", http.StatusBadRequest)
+	if req.Role == nil && req.IsActive == nil && req.FirstName == nil && req.LastName == nil {
+		http.Error(w, "role, is_active, or name required", http.StatusBadRequest)
 		return
 	}
 
@@ -57,6 +64,23 @@ func (h *Handler) UserByIDAPI(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if req.FirstName != nil || req.LastName != nil {
+		if req.FirstName == nil || req.LastName == nil {
+			http.Error(w, "укажите имя и фамилию", http.StatusBadRequest)
+			return
+		}
+		first := strings.TrimSpace(*req.FirstName)
+		last := strings.TrimSpace(*req.LastName)
+		if first == "" || last == "" {
+			http.Error(w, "укажите имя и фамилию", http.StatusBadRequest)
+			return
+		}
+		if err := h.userService.UpdateProfile(userID, &first, &last); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+
 	if req.Role != nil {
 		role := strings.TrimSpace(*req.Role)
 		if role != "student" && role != "coach" {
@@ -75,5 +99,29 @@ func (h *Handler) UserByIDAPI(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	h.writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true})
+}
+
+func (h *Handler) deleteStudentUser(w http.ResponseWriter, actorID, userID int64) {
+	if userID == actorID {
+		http.Error(w, "нельзя удалить себя", http.StatusBadRequest)
+		return
+	}
+	target, err := h.userService.GetByID(userID)
+	if err != nil || target == nil {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+	if target.Role != "student" {
+		http.Error(w, "удалить можно только ученика", http.StatusBadRequest)
+		return
+	}
+	if h.sessionService != nil {
+		_ = h.sessionService.RevokeAllForUser(userID)
+	}
+	if err := h.userService.DeleteUser(userID); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	h.writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true})
 }

@@ -33,6 +33,7 @@ type UserService interface {
 	SetRole(telegramID int64, role string) error
 	RegisterAsCoach(telegramID int64, specialty, experience, description string) error
 	UpdateProfile(userID int64, firstName, lastName *string) error
+	DeleteUser(userID int64) error
 
 	GetAllStudents() ([]*models.User, error)
 	GetByID(id int64) (*models.User, error)

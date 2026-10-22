@@ -202,8 +202,12 @@ export class CalendarService {
     return this.http.post(`${this.apiUrl}/templates/${id}/deactivate`, {}, this.getRequestOptions());
   }
 
-  patchUser(id: number, body: { role?: string; is_active?: boolean }): Observable<any> {
+  patchUser(id: number, body: { role?: string; is_active?: boolean; first_name?: string; last_name?: string }): Observable<any> {
     return this.http.patch(`${this.apiUrl}/users/${id}`, body, this.getRequestOptions());
+  }
+
+  deleteUser(id: number): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/users/${id}`, this.getRequestOptions());
   }
 
   unmarkAttendance(trainingId: number, studentId: number): Observable<any> {
